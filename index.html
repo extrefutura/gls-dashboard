@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Logistic PRO — GLS Cáceres</title>
+<!-- v9.3 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#010103;color:#e2e8f0;font-family:system-ui,sans-serif;min-height:100vh}
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-thumb{background:rgba(99,102,241,0.3);border-radius:20px}
+  input{color:#e2e8f0}
+  input::placeholder{color:#334155}
+  button{cursor:pointer;border:none;background:none;color:inherit}
+  select option{background:#0f172a;color:white}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+
+const ICONS = {
+  truck:"M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM18.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
+  package:"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96L12 12.01l8.73-5.05M12 22.08V12",
+  search:"M11 17a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM21 21l-4.35-4.35",
+  upload:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  trash:"M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2",
+  eye:"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  x:"M18 6L6 18M6 6l12 12",
+  check:"M20 6L9 17l-5-5",
+  user:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  zap:"M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  alert:"M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
+  clock:"M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 6v6l4 2",
+  checkCircle:"M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3",
+  trendUp:"M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
+  brain:"M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.88A2.5 2.5 0 0 1 9.5 2M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.88A2.5 2.5 0 0 0 14.5 2z",
+  send:"M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",
+  msg:"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
+  db:"M4 6c0 1.1 3.6 2 8 2s8-.9 8-2-3.6-2-8-2-8 .9-8 2zM4 6v4c0 1.1 3.6 2 8 2s8-.9 8-2V6M4 14v4c0 1.1 3.6 2 8 2s8-.9 8-2v-4",
+  layout:"M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
+  settings:"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+  shield:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  chevL:"M15 18l-6-6 6-6",
+  chevR:"M9 18l6-6-6-6",
+  fileText:"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
+  map:"M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16",
+  file:"M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM13 2v7h7",
+};
+
+const Ico = ({ d, size=18, color="currentColor", stroke=2 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+    <path d={d}/>
+  </svg>
+);
+
+const DRIVERS = ["CARMEN MATEOS","CARLOS AVIS","ANA ISABEL","RUBEN NEVADO","JUAN PEDRO","JORGE JUAN","CHRISTIAN RUBIO","ALVARO MUÑOZ","SERGIO CATALAN","JUAN GOMEZ","ANTONIO BENITO","DAVID RUEDA"];
+const SECTIONS = ["ENVIOS EN ALMACEN","INCIDENCIAS PENDIENTE","RECOGERAN EN AGENCIA (REA)","SIN ASIGNAR ⚠"];
+const ALL_HEADERS = [...DRIVERS,...SECTIONS];
+
+const CP_MAP = {
+  "10130":"CARMEN MATEOS","10135":"CARMEN MATEOS","10134":"CARMEN MATEOS","10109":"CARMEN MATEOS","10110":"CARMEN MATEOS","10262":"CARMEN MATEOS",
+  "10132":"CARLOS AVIS","10184":"CARLOS AVIS","10186":"CARLOS AVIS","10180":"CARLOS AVIS","10170":"CARLOS AVIS","10161":"CARLOS AVIS","10187":"CARLOS AVIS",
+  "10140":"ANA ISABEL","10160":"RUBEN NEVADO","10198":"JUAN PEDRO",
+  "10136":"JORGE JUAN","10129":"JORGE JUAN","10374":"JORGE JUAN","10379":"JORGE JUAN","10137":"JORGE JUAN",
+  "10200":"CHRISTIAN RUBIO","10290":"CHRISTIAN RUBIO","10291":"CHRISTIAN RUBIO","10252":"CHRISTIAN RUBIO",
+  "10251":"ALVARO MUÑOZ",
+  "10210":"SERGIO CATALAN","10269":"SERGIO CATALAN","10230":"SERGIO CATALAN","10240":"SERGIO CATALAN","10250":"SERGIO CATALAN","10261":"SERGIO CATALAN","10260":"SERGIO CATALAN","10189":"SERGIO CATALAN","10280":"SERGIO CATALAN","10271":"SERGIO CATALAN",
+  "10100":"JUAN GOMEZ","10191":"JUAN GOMEZ","10183":"JUAN GOMEZ",
+};
+const assignDriver = cp => CP_MAP[String(cp).trim()] || "SIN ASIGNAR ⚠";
+
+const ESTADO_MAP = {
+  7:{label:"Entregado",color:"#10b981"},
+  6:{label:"Pendiente",color:"#f59e0b"},
+  22:{label:"ParcelShop",color:"#3b82f6"},
+  3:{label:"Devuelto",color:"#ef4444"},
+  9:{label:"Incidencia",color:"#a855f7"},
+};
+
+const SERVICE_MAP = {
+  "0":{label:"10 HORAS",color:"#f59e0b",premium:true},
+  "2":{label:"VALIJA",color:"#f97316",premium:true},
+  "92":{label:"PARCEL",color:"#3b82f6",premium:false},
+  "10":{label:"RETORNO",color:"#f97316",premium:false},
+  "37":{label:"ECONOMY",color:"#94a3b8",premium:false},
+  "96":{label:"24 HORAS",color:"#10b981",premium:true},
+  "97":{label:"PARCEL",color:"#3b82f6",premium:false},
+  "98":{label:"ENTREGA HOY",color:"#10b981",premium:true},
+  "1":{label:"19 HORAS",color:"#6366f1",premium:false},
+};
+
+const processCSV = (text) => {
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if (!lines.length) return [];
+  const sep = lines[0].includes("\t")?"\t":";";
+  const headers = lines[0].split(sep).map(h=>h.trim().toLowerCase());
+  const col = n => headers.indexOf(n.toLowerCase());
+  const iCodExp=col("codexp"), iSrv=col("codservicio"), iNomb=col("nombdst"), iDir=col("dirdst"), iCp=col("cpdst"), iLoc=col("localidaddst");
+  const iEstado=col("eventocodigo")!==-1?col("eventocodigo"):col("eventcodigo");
+  const iBultos=col("bultos"), iKilos=col("kilos"), iObserv=col("observ");
+  const iFP=(()=>{for(const n of["fprevientrega","fpreventrega","fprev","fentrega"]){const i=headers.findIndex(h=>h.replace(/[^a-z]/g,"").includes(n.replace(/[^a-z]/g,"")));if(i!==-1)return i;}return -1;})();
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const c=lines[i].split(sep).map(x=>x.trim());
+    const id=iCodExp!==-1?c[iCodExp]:""; if(!id||id.length<3) continue;
+    const srvCode=String(iSrv!==-1?c[iSrv]:"");
+    const srvInfo=SERVICE_MAP[srvCode]||{label:srvCode||"STD",color:"#64748b",premium:false};
+    const estadoRaw=iEstado!==-1?parseInt(c[iEstado]):6;
+    const nota=iObserv!==-1?c[iObserv]:"";
+    const cp=iCp!==-1?c[iCp]:"00000";
+    out.push({id,conductor:assignDriver(cp),cliente:iNomb!==-1?c[iNomb]:"DEST",direccion:iDir!==-1?c[iDir]:"SIN DIR.",localidad:iLoc!==-1?c[iLoc]:"LOCALIDAD",cp,estado:isNaN(estadoRaw)?6:estadoRaw,bultos:iBultos!==-1?parseInt(c[iBultos])||1:1,kgs:iKilos!==-1?parseFloat(c[iKilos])||0:0,fPrevista:iFP!==-1?c[iFP]:"--/--/--",srvCode,srvLabel:srvInfo.label,srvColor:srvInfo.color,isPremium:srvInfo.premium,nota,tieneNota:nota.length>2});
+  }
+  return out;
+};
+
+const isUrgent = fp => {
+  if(!fp||fp==="--/--/--") return false;
+  const p=fp.split("/"); if(p.length<3) return false;
+  const [d,m,y]=p; const year=y.length===2?"20"+y:y;
+  const dt=new Date(parseInt(year),parseInt(m)-1,parseInt(d));
+  const now=new Date(); now.setHours(0,0,0,0); return dt<=now;
+};
+
+function App() {
+  const [view,setView]=useState("dashboard");
+  const [data,setData]=useState([]);
+  const [search,setSearch]=useState("");
+  const [selDriver,setSelDriver]=useState("TODOS");
+  const [selStatus,setSelStatus]=useState(null);
+  const [detailItem,setDetailItem]=useState(null);
+  const [noteText,setNoteText]=useState(null);
+  const [page,setPage]=useState(1);
+  const [showUpload,setShowUpload]=useState(false);
+  const [n8nStatus,setN8nStatus]=useState(null);
+  const [n8nUrl,setN8nUrl]=useState(()=>{try{return localStorage.getItem("n8n_url")||"";}catch(e){return "";}});
+  const [n8nLoading,setN8nLoading]=useState(false);
+  const [n8nError,setN8nError]=useState("");
+  const [n8nLog,setN8nLog]=useState([]);
+  const [showN8nConfig,setShowN8nConfig]=useState(false);
+  const [messages,setMessages]=useState([{role:"assistant",text:"Sistema listo. Carga datos desde n8n o CSV para comenzar."}]);
+  const [chatInput,setChatInput]=useState("");
+  const [isTyping,setIsTyping]=useState(false);
+  const [aiInsight,setAiInsight]=useState("");
+  const [analyzing,setAnalyzing]=useState(false);
+  const chatEndRef=useRef(null);
+  const pollRef=useRef(null);
+  const PER_PAGE=12;
+
+  const addLog=(msg,type="info")=>setN8nLog(prev=>[{ts:new Date().toLocaleTimeString("es-ES"),msg,type},...prev].slice(0,50));
+  const saveN8nUrl=url=>{setN8nUrl(url);try{localStorage.setItem("n8n_url",url);}catch(e){}};
+
+  useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+
+  const pullAllSheets=async()=>{
+    if(!n8nUrl){setShowN8nConfig(true);return;}
+    setN8nLoading(true);setN8nError("");addLog("Iniciando carga desde n8n...");
+    try{
+      addLog(`GET ${n8nUrl}/webhook/gls-sheets`);
+      const r=await fetch(`${n8nUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+      if(!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
+      const sd=await r.json();
+      const hojas=sd.repartidores||[];
+      addLog(`✓ ${hojas.length} hojas encontradas`,"ok");
+      if(!hojas.length) throw new Error("No hay hojas asignadas en GLS Atlas hoy.");
+      const allEnvios=[];
+      for(const h of hojas){
+        try{
+          addLog(`Descargando: ${h.nombre}`);
+          const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"POST",mode:"cors",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetCode:h.sheetCode,placeCode:h.placeCode,nombre:h.nombre})});
+          if(!re.ok) throw new Error(`HTTP ${re.status}`);
+          const rd=await re.json();
+          allEnvios.push(...(rd.envios||[]));
+          addLog(`✓ ${h.nombre}: ${(rd.envios||[]).length} envíos`,"ok");
+        }catch(e){addLog(`✗ ${h.nombre}: ${e.message}`,"error");}
+      }
+      if(!allEnvios.length) throw new Error("No se encontraron expediciones.");
+      const processed=allEnvios.map(r=>{
+        const srvCode=String(r.codservicio||"");
+        const srvInfo=SERVICE_MAP[srvCode]||{label:srvCode||"STD",color:"#64748b",premium:false};
+        const nota=r.observ||"";
+        return{id:r.codexp,conductor:r.conductor||assignDriver(r.cpdst),cliente:r.nombdst||"DEST",direccion:r.dirdst||"SIN DIR.",localidad:r.localidaddst||"LOCALIDAD",cp:r.cpdst||"00000",estado:parseInt(r.eventoCodigo)||6,bultos:parseInt(r.bultos)||1,kgs:parseFloat(r.kilos)||0,fPrevista:r.fpreviEntrega||"--/--/--",srvCode,srvLabel:srvInfo.label,srvColor:srvInfo.color,isPremium:srvInfo.premium,nota,tieneNota:nota.length>2};
+      });
+      setData(prev=>{const m=new Map([...prev,...processed].map(x=>[x.id,x]));return[...m.values()];});
+      setN8nStatus("ok");setPage(1);
+      addLog(`✓ Total: ${processed.length} expediciones cargadas`,"ok");
+    }catch(e){
+      setN8nStatus("err");
+      let msg=e.message||"Error desconocido";
+      if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")){
+        msg="CORS bloqueado — Aplica las variables de entorno en EasyPanel y reinicia n8n.";
+        addLog("→ Variables necesarias: WEBHOOK_CORS_ALLOWED_ORIGINS=*","error");
+      }
+      setN8nError(msg);addLog(`✗ ${msg}`,"error");
+    }
+    setN8nLoading(false);
+  };
+
+  const pullEstados=async()=>{
+    if(!n8nUrl||!data.length) return;
+    try{
+      const r=await fetch(`${n8nUrl}/webhook/gls-estados`,{mode:"cors"});
+      if(!r.ok) return;
+      const updates=await r.json();
+      if(!Array.isArray(updates)||!updates.length) return;
+      setData(prev=>{const m=new Map(prev.map(x=>[x.id,x]));updates.forEach(u=>{if(m.has(u.codexp))m.set(u.codexp,{...m.get(u.codexp),estado:parseInt(u.eventoCodigo)||6});});return[...m.values()];});
+      setN8nStatus("ok");addLog(`✓ Estados actualizados: ${updates.length}`,"ok");
+    }catch(e){}
+  };
+
+  useEffect(()=>{
+    if(pollRef.current) clearInterval(pollRef.current);
+    if(n8nUrl) pollRef.current=setInterval(pullEstados,10*60*1000);
+    return()=>{if(pollRef.current)clearInterval(pollRef.current);};
+  },[n8nUrl,data.length]);
+
+  // Recibir datos desde n8n via webhook POST directo al dashboard
+  useEffect(()=>{
+    const handler=e=>{
+      if(!e.data?.type) return;
+      if(e.data.type==="gls-incoming"){
+        const processed=(e.data.payload||[]).map(r=>{
+          const srvCode=String(r.codservicio||"");
+          const srvInfo=SERVICE_MAP[srvCode]||{label:srvCode||"STD",color:"#64748b",premium:false};
+          return{id:r.codexp,conductor:r.conductor||assignDriver(r.cpdst),cliente:r.nombdst||"DEST",direccion:r.dirdst||"SIN DIR.",localidad:r.localidaddst||"LOCALIDAD",cp:r.cpdst||"00000",estado:parseInt(r.eventoCodigo)||6,bultos:parseInt(r.bultos)||1,kgs:parseFloat(r.kilos)||0,fPrevista:r.fpreviEntrega||"--/--/--",srvCode,srvLabel:srvInfo.label,srvColor:srvInfo.color,isPremium:srvInfo.premium,nota:r.observ||"",tieneNota:(r.observ||"").length>2};
+        });
+        setData(prev=>{const m=new Map([...prev,...processed].map(x=>[x.id,x]));return[...m.values()];});
+        setN8nStatus("ok");setPage(1);
+        addLog(`✓ ${processed.length} expediciones recibidas`,"ok");
+      }
+      if(e.data.type==="update-estados"){
+        const updates=e.data.payload||[];
+        if(!updates.length) return;
+        setData(prev=>{const m=new Map(prev.map(x=>[x.id,x]));updates.forEach(u=>{if(m.has(u.codexp))m.set(u.codexp,{...m.get(u.codexp),estado:parseInt(u.eventoCodigo)||6});});return[...m.values()];});
+        setN8nStatus("ok");
+      }
+    };
+    window.addEventListener("message",handler);
+    return()=>window.removeEventListener("message",handler);
+  },[]);
+
+  const filtered=useMemo(()=>data.filter(d=>{
+    const ms=[d.id,d.cliente,d.direccion,d.srvLabel].some(v=>String(v).toLowerCase().includes(search.toLowerCase()));
+    const md=selDriver==="TODOS"||d.conductor===selDriver;
+    const mst=selStatus===null||d.estado===selStatus;
+    return ms&&md&&mst;
+  }),[data,search,selDriver,selStatus]);
+
+  const kpi=useMemo(()=>{
+    const t=filtered.length;
+    return{total:t,ok:filtered.filter(d=>d.estado===7).length,premium:filtered.filter(d=>d.isPremium).length,err:filtered.filter(d=>d.estado===9).length,rate:t?Math.round(filtered.filter(d=>d.estado===7).length/t*100):0};
+  },[filtered]);
+
+  const driverStats=useMemo(()=>{
+    const s={};
+    ALL_HEADERS.forEach(n=>s[n]={total:0,ok:0,alerts:0,premium:0,kgs:0});
+    data.forEach(d=>{if(s[d.conductor]){s[d.conductor].total++;s[d.conductor].kgs+=d.kgs||0;if(d.estado===7)s[d.conductor].ok++;if(d.estado===9)s[d.conductor].alerts++;if(d.isPremium)s[d.conductor].premium++;}});
+    return s;
+  },[data]);
+
+  const totalPages=Math.ceil(filtered.length/PER_PAGE)||1;
+  const paged=filtered.slice((page-1)*PER_PAGE,page*PER_PAGE);
+
+  const handleImport=newData=>{
+    setData(prev=>{const m=new Map([...prev,...newData].map(x=>[x.id,x]));return[...m.values()];});
+    setPage(1);
+  };
+
+  const handleChat=async()=>{
+    if(!chatInput.trim()) return;
+    const q=chatInput;setChatInput("");setIsTyping(true);
+    setMessages(prev=>[...prev,{role:"user",text:q}]);
+    const snap={};
+    [...DRIVERS,...SECTIONS].forEach(n=>{const dd=data.filter(d=>d.conductor===n);if(dd.length)snap[n]={total:dd.length,incidencias:dd.filter(d=>d.estado===9).length,urgentes:dd.filter(d=>isUrgent(d.fPrevista)).length,ids:dd.map(d=>d.id)};});
+    const sys=`Eres controlador logístico GLS Cáceres. Datos: ${JSON.stringify(snap)}\nRepartidores: ${[...DRIVERS,...SECTIONS].join(", ")}\nPara reasignar usa: <ACCION>{"tipo":"reasignar","expediciones":["ID1"],"destino":"NOMBRE"}</ACCION>\nResponde en español, conciso.`;
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:sys,messages:[{role:"user",content:q}]})});
+      const res=await r.json();
+      const fullText=res.content?.[0]?.text||"Sin respuesta.";
+      const am=fullText.match(/<ACCION>([\s\S]*?)<\/ACCION>/);
+      const tl=fullText.replace(/<ACCION>[\s\S]*?<\/ACCION>/g,"").trim();
+      if(am){
+        try{
+          const ac=JSON.parse(am[1]);
+          if(ac.tipo==="reasignar"&&ac.expediciones?.length&&ac.destino){
+            setData(prev=>prev.map(d=>ac.expediciones.includes(d.id)?{...d,conductor:ac.destino.toUpperCase()}:d));
+            setMessages(prev=>[...prev,{role:"assistant",text:tl,accion:{count:ac.expediciones.length,destino:ac.destino}}]);
+          }else setMessages(prev=>[...prev,{role:"assistant",text:tl}]);
+        }catch{setMessages(prev=>[...prev,{role:"assistant",text:tl}]);}
+      }else setMessages(prev=>[...prev,{role:"assistant",text:tl}]);
+    }catch(e){setMessages(prev=>[...prev,{role:"assistant",text:"Error de conexión con la API."}]);}
+    setIsTyping(false);
+  };
+
+  const doAnalysis=async()=>{
+    if(!data.length) return;
+    setAnalyzing(true);
+    const detail=DRIVERS.map(n=>{const dd=data.filter(d=>d.conductor===n);return{repartidor:n,total:dd.length,entregados:dd.filter(d=>d.estado===7).length,incidencias:dd.filter(d=>d.estado===9).length,kgs:+(dd.reduce((a,d)=>a+(d.kgs||0),0)).toFixed(1)};}).filter(d=>d.total>0);
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,messages:[{role:"user",content:`Analiza estos datos de reparto GLS Cáceres. Dame 3 secciones: DIAGNÓSTICO, RECOMENDACIONES y MEJORAS APP. Datos: ${JSON.stringify(detail)}. Responde en español, con nombres específicos.`}]})});
+      const res=await r.json();
+      setAiInsight(res.content?.[0]?.text||"Análisis completado.");
+    }catch(e){setAiInsight("Error al generar análisis.");}
+    setAnalyzing(false);
+  };
+
+  const StatusBadge=({estado})=>{
+    const s=ESTADO_MAP[estado]||{label:`COD ${estado}`,color:"#64748b"};
+    return <span style={{padding:"0.25rem 0.75rem",borderRadius:"9999px",fontSize:"0.65rem",fontWeight:900,color:s.color,background:s.color+"22",border:`1px solid ${s.color}44`}}>{s.label}</span>;
+  };
+
+  const DetailPanel=({item,onClose})=>(
+    <div style={{position:"fixed",inset:0,zIndex:80,display:"flex",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)"}} onClick={onClose}/>
+      <div style={{position:"relative",width:"100%",maxWidth:480,background:"#09090f",borderLeft:"1px solid #1e293b",height:"100%",overflowY:"auto"}}>
+        <div style={{padding:"1.5rem",borderBottom:"1px solid #1e293b",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,background:"#09090f",zIndex:10}}>
+          <div style={{display:"flex",gap:"1rem",alignItems:"center"}}>
+            <div style={{width:44,height:44,borderRadius:"0.875rem",background:item.isPremium?"#f59e0b":"#4f46e5",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Ico d={item.isPremium?ICONS.zap:ICONS.package} size={20} color="white"/>
+            </div>
+            <div>
+              <div style={{fontSize:"1rem",fontWeight:900,color:"white",fontFamily:"monospace"}}>{item.id}</div>
+              <div style={{fontSize:"0.65rem",color:"#6366f1",fontWeight:800,textTransform:"uppercase"}}>{item.conductor}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{padding:"0.5rem",borderRadius:"0.75rem",background:"rgba(255,255,255,0.05)",color:"#64748b"}}><Ico d={ICONS.x} size={18}/></button>
+        </div>
+        <div style={{padding:"1.5rem",display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem"}}>
+            {[{l:"Situación",v:<StatusBadge estado={item.estado}/>},{l:"Bultos",v:`${item.bultos} U`},{l:"Peso",v:`${item.kgs} KG`}].map((k,i)=>(
+              <div key={i} style={{background:"#0f172a",borderRadius:"1rem",padding:"0.875rem",border:"1px solid #1e293b",textAlign:"center"}}>
+                <div style={{fontSize:"0.55rem",color:"#475569",textTransform:"uppercase",fontWeight:800,marginBottom:"0.5rem"}}>{k.l}</div>
+                <div style={{fontWeight:900,fontSize:"0.8rem",color:"white"}}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:"#050508",borderRadius:"1.25rem",padding:"1.25rem",border:"1px solid #1e293b"}}>
+            <div style={{fontSize:"0.6rem",color:"#4f46e5",textTransform:"uppercase",fontWeight:900,letterSpacing:"0.2em",borderBottom:"1px solid rgba(79,70,229,0.2)",paddingBottom:"0.5rem",marginBottom:"1rem"}}>Destinatario</div>
+            <div style={{fontSize:"1.2rem",fontWeight:900,color:"white",textTransform:"uppercase",marginBottom:"1rem"}}>{item.cliente}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem",fontSize:"0.75rem"}}>
+              <div><div style={{fontSize:"0.55rem",color:"#334155",textTransform:"uppercase",marginBottom:"0.25rem"}}>Dirección</div><div style={{color:"#cbd5e1",fontWeight:700}}>{item.direccion}</div></div>
+              <div><div style={{fontSize:"0.55rem",color:"#334155",textTransform:"uppercase",marginBottom:"0.25rem"}}>Localidad</div><div style={{color:"#cbd5e1",fontWeight:700}}>{item.localidad} <span style={{color:"#6366f1"}}>({item.cp})</span></div></div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
+            {[{l:"Servicio",v:item.srvLabel,c:item.srvColor},{l:"F. Prevista",v:item.fPrevista,c:"white"},{l:"Premium",v:item.isPremium?"Sí":"No",c:item.isPremium?"#f59e0b":"#64748b"},{l:"Cód. srv",v:item.srvCode||"—",c:"#94a3b8"}].map((r,i)=>(
+              <div key={i} style={{background:"#0f172a",borderRadius:"0.875rem",padding:"0.875rem",border:"1px solid #1e293b",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{color:"#475569",fontWeight:700,fontSize:"0.65rem"}}>{r.l}</span>
+                <span style={{color:r.c,fontWeight:900,fontSize:"0.75rem"}}>{r.v}</span>
+              </div>
+            ))}
+          </div>
+          {item.tieneNota&&(
+            <div style={{background:"rgba(245,158,11,0.07)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:"1.25rem",padding:"1.25rem"}}>
+              <div style={{fontSize:"0.6rem",color:"#f59e0b",textTransform:"uppercase",fontWeight:900,marginBottom:"0.5rem"}}>📝 Nota</div>
+              <p style={{color:"#94a3b8",fontSize:"0.8rem",fontStyle:"italic",lineHeight:1.6}}>{item.nota}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const UploadModal=({onClose,onImport})=>{
+    const [slots,setSlots]=useState([]);
+    const [importing,setImporting]=useState(false);
+    const addFiles=async files=>{
+      const ns=[];
+      for(const file of Array.from(files)){
+        const isCSV=file.name.toLowerCase().endsWith(".csv");
+        let count=0,csvText=null;
+        if(isCSV){
+          csvText=await new Promise(resolve=>{const r=new FileReader();r.onload=ev=>resolve(ev.target.result);r.readAsText(file,"latin1");});
+          count=Math.max(0,csvText.split(/\r?\n/).filter(l=>l.trim()).length-1);
+        }
+        ns.push({file,fileName:file.name,csvText,isCSV,count});
+      }
+      setSlots(prev=>{const ex=new Set(prev.map(s=>s.fileName));return[...prev,...ns.filter(s=>!ex.has(s.fileName))];});
+    };
+    const handleImport=async()=>{
+      setImporting(true);
+      const all=[];
+      for(const s of slots) if(s.isCSV) all.push(...processCSV(s.csvText));
+      onImport(all);setImporting(false);onClose();
+    };
+    const total=slots.reduce((a,s)=>a+s.count,0);
+    return(
+      <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.8)",backdropFilter:"blur(10px)"}} onClick={onClose}/>
+        <div style={{position:"relative",width:"100%",maxWidth:580,background:"#0a0a12",border:"1px solid #1e293b",borderRadius:"2rem",overflow:"hidden"}}>
+          <div style={{padding:"1.5rem 2rem",borderBottom:"1px solid #1e293b",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(0,0,0,0.3)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <div style={{padding:"0.625rem",background:"#4f46e5",borderRadius:"0.875rem"}}><Ico d={ICONS.upload} size={20} color="white"/></div>
+              <div>
+                <h2 style={{fontSize:"1rem",fontWeight:900,color:"white",textTransform:"uppercase"}}>Cargar CSV</h2>
+                <p style={{fontSize:"0.6rem",color:"#475569",fontWeight:700}}>Asignación automática por código postal</p>
+              </div>
+            </div>
+            <button onClick={onClose} style={{padding:"0.5rem",borderRadius:"0.75rem",background:"rgba(255,255,255,0.05)",color:"#64748b"}}><Ico d={ICONS.x} size={18}/></button>
+          </div>
+          <div style={{padding:"1.25rem"}}>
+            <div onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();addFiles(e.dataTransfer.files);}}
+              style={{border:"2px dashed #1e293b",borderRadius:"1.5rem",padding:"2rem",textAlign:"center",cursor:"pointer"}}
+              onClick={()=>document.getElementById("fui").click()}>
+              <input id="fui" type="file" multiple accept=".csv" onChange={e=>addFiles(e.target.files)} style={{display:"none"}}/>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"0.75rem"}}>
+                <div style={{padding:"1rem",background:"rgba(99,102,241,0.1)",borderRadius:"1rem"}}><Ico d={ICONS.upload} size={28} color="#6366f1"/></div>
+                <p style={{fontSize:"0.8rem",fontWeight:800,color:"#94a3b8"}}>Arrastra archivos o <span style={{color:"#6366f1"}}>haz clic</span></p>
+              </div>
+            </div>
+            {slots.length>0&&<div style={{marginTop:"1rem",display:"flex",flexDirection:"column",gap:"0.5rem"}}>
+              {slots.map((s,i)=>(
+                <div key={s.fileName} style={{display:"flex",alignItems:"center",gap:"0.75rem",background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.25)",borderRadius:"1rem",padding:"0.75rem 1rem"}}>
+                  <Ico d={ICONS.file} size={16} color="#818cf8"/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{fontSize:"0.7rem",fontWeight:800,color:"white",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.fileName}</p>
+                    <p style={{fontSize:"0.6rem",color:"#475569",fontWeight:700}}>{s.count} filas</p>
+                  </div>
+                  <button onClick={()=>setSlots(prev=>prev.filter((_,idx)=>idx!==i))} style={{padding:"0.375rem",borderRadius:"0.5rem",background:"rgba(239,68,68,0.1)"}}><Ico d={ICONS.trash} size={14} color="#ef4444"/></button>
+                </div>
+              ))}
+            </div>}
+          </div>
+          <div style={{padding:"1rem 1.5rem",borderTop:"1px solid #1e293b",background:"rgba(0,0,0,0.3)",display:"flex",justifyContent:"flex-end",gap:"0.75rem"}}>
+            <button onClick={onClose} style={{padding:"0.75rem 1.5rem",background:"rgba(255,255,255,0.05)",border:"1px solid #1e293b",borderRadius:"1rem",fontSize:"0.7rem",fontWeight:900,color:"#64748b"}}>Cancelar</button>
+            <button onClick={handleImport} disabled={importing||!slots.length} style={{padding:"0.75rem 2rem",background:slots.length?"#4f46e5":"#1e293b",borderRadius:"1rem",fontSize:"0.7rem",fontWeight:900,color:"white",opacity:slots.length?1:0.4}}>
+              {importing?"Importando…":`Importar (${total} exp.)`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const StrategyView=()=>{
+    const chartData=DRIVERS.map(n=>{const s=driverStats[n];return{name:n.split(" ")[0],...s};});
+    const statusDist=Object.entries(ESTADO_MAP).map(([c,s])=>({name:s.label,value:data.filter(d=>d.estado===parseInt(c)).length,color:s.color})).filter(d=>d.value>0);
+    return(
+      <div style={{maxWidth:1200,margin:"0 auto",display:"flex",flexDirection:"column",gap:"1.5rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1.5rem"}}>
+          <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid #1e293b",borderRadius:"2rem",padding:"1.5rem"}}>
+            <h3 style={{fontSize:"0.65rem",fontWeight:900,textTransform:"uppercase",color:"#475569",marginBottom:"1.25rem",letterSpacing:"0.15em"}}>Carga por Repartidor</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.625rem"}}>
+              {chartData.sort((a,b)=>b.total-a.total).map(d=>{
+                const pct=data.length?Math.round(d.total/data.length*100):0;
+                const okPct=d.total?Math.round(d.ok/d.total*100):0;
+                return(
+                  <div key={d.name} style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                    <span style={{width:80,fontSize:"0.65rem",fontWeight:800,color:"#64748b",textAlign:"right",flexShrink:0}}>{d.name}</span>
+                    <div style={{flex:1,height:24,background:"#0f172a",borderRadius:9999,overflow:"hidden",border:"1px solid #1e293b",position:"relative"}}>
+                      <div style={{height:"100%",width:`${Math.min(pct*3,100)}%`,background:"linear-gradient(90deg,#4f46e5,#818cf8)",borderRadius:9999}}/>
+                      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 0.5rem"}}>
+                        <span style={{fontSize:"0.6rem",fontWeight:900,color:"rgba(255,255,255,0.8)"}}>{d.total}</span>
+                        <span style={{fontSize:"0.6rem",fontWeight:900,color:"#10b981"}}>{okPct}%</span>
+                      </div>
+                    </div>
+                    {d.alerts>0&&<span style={{fontSize:"0.6rem",fontWeight:900,color:"#ef4444",width:36}}>⚠{d.alerts}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid #1e293b",borderRadius:"2rem",padding:"1.5rem"}}>
+            <h3 style={{fontSize:"0.65rem",fontWeight:900,textTransform:"uppercase",color:"#475569",marginBottom:"1.25rem",letterSpacing:"0.15em"}}>Distribución de Estados</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.625rem"}}>
+              {statusDist.map(d=>{
+                const pct=kpi.total?Math.round(d.value/kpi.total*100):0;
+                return(
+                  <div key={d.name} style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                    <span style={{width:80,fontSize:"0.65rem",fontWeight:800,color:"#64748b",textAlign:"right",flexShrink:0}}>{d.name}</span>
+                    <div style={{flex:1,height:24,background:"#0f172a",borderRadius:9999,overflow:"hidden",border:"1px solid #1e293b",position:"relative"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:d.color,borderRadius:9999}}/>
+                      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",padding:"0 0.5rem"}}>
+                        <span style={{fontSize:"0.6rem",fontWeight:900,color:"white"}}>{d.value} ({pct}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem",marginTop:"1.25rem"}}>
+              {[{l:"Tasa entrega",v:`${kpi.rate}%`,c:"#10b981"},{l:"Incidencias",v:kpi.err,c:"#ef4444"},{l:"Premium",v:kpi.premium,c:"#f59e0b"},{l:"Total flota",v:data.length,c:"#6366f1"}].map((s,i)=>(
+                <div key={i} style={{background:"#050508",borderRadius:"1rem",padding:"0.875rem",border:"1px solid #1e293b",textAlign:"center"}}>
+                  <div style={{fontSize:"0.55rem",color:"#334155",textTransform:"uppercase",fontWeight:800,marginBottom:"0.25rem"}}>{s.l}</div>
+                  <div style={{fontSize:"1.5rem",fontWeight:900,color:s.c}}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{background:"linear-gradient(135deg,rgba(79,70,229,0.2),rgba(9,9,15,1))",border:"1px solid rgba(99,102,241,0.2)",borderRadius:"2rem",padding:"2rem"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.25rem"}}>
+            <div style={{padding:"0.625rem",background:"#4f46e5",borderRadius:"0.875rem"}}><Ico d={ICONS.brain} size={18} color="white"/></div>
+            <h3 style={{fontSize:"0.75rem",fontWeight:900,textTransform:"uppercase",color:"white"}}>Análisis Estratégico IA</h3>
+          </div>
+          <div style={{background:"rgba(0,0,0,0.4)",borderRadius:"1.25rem",padding:"1.25rem",marginBottom:"1rem",minHeight:80,maxHeight:340,overflowY:"auto"}}>
+            {aiInsight?<p style={{color:"#cbd5e1",fontSize:"0.78rem",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{aiInsight}</p>:<p style={{color:"#475569",fontSize:"0.78rem",fontStyle:"italic"}}>Carga datos y pulsa Generar Análisis.</p>}
+          </div>
+          <button onClick={doAnalysis} disabled={analyzing||!data.length} style={{padding:"0.75rem 2rem",background:data.length?"white":"#1e293b",color:data.length?"#1e1b4b":"#475569",borderRadius:"1rem",fontWeight:900,fontSize:"0.7rem",textTransform:"uppercase",border:"none",opacity:analyzing?0.7:1}}>
+            {analyzing?"Analizando…":"Generar Análisis"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const N8nView=()=>{
+    const [localUrl,setLocalUrl]=useState(n8nUrl);
+    const testCors=async()=>{
+      if(!localUrl) return;
+      addLog(`Probando CORS → ${localUrl}/webhook/gls-sheets`);
+      try{
+        const r=await fetch(`${localUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+        addLog(`✓ HTTP ${r.status} — CORS OK`,"ok");
+      }catch(e){addLog(`✗ CORS bloqueado: ${e.message} — Aplica las variables en EasyPanel`,"error");}
+    };
+    const testIncoming=()=>{
+      const mock=Array.from({length:5},(_,i)=>({codexp:`GLS${100000+i}`,codservicio:["96","0","37","98","1"][i],nombdst:`EMPRESA TEST ${i+1}`,dirdst:`C/ MAYOR ${i+10}`,localidaddst:["TRUJILLO","MIAJADAS","MONTÁNCHEZ","LOGROSÁN","GARCIAZ"][i],cpdst:["10200","10100","10170","10180","10250"][i],eventoCodigo:[6,6,7,6,9][i],bultos:1,kilos:2.5,fpreviEntrega:new Date().toLocaleDateString("es-ES"),observ:"",conductor:""}));
+      window.dispatchEvent(new MessageEvent("message",{data:{type:"gls-incoming",payload:mock}}));
+    };
+    return(
+      <div style={{maxWidth:860,margin:"0 auto",display:"flex",flexDirection:"column",gap:"1.5rem"}}>
+        <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:"2rem",padding:"1.5rem"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1rem"}}>
+            <div style={{padding:"0.625rem",background:"#4f46e5",borderRadius:"0.875rem"}}><Ico d={ICONS.settings} size={18} color="white"/></div>
+            <div>
+              <h2 style={{fontSize:"0.9rem",fontWeight:900,color:"white",textTransform:"uppercase"}}>URL de n8n</h2>
+              <p style={{fontSize:"0.6rem",color:"#475569",fontWeight:700}}>URL base de tu instancia (sin barra final)</p>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:"0.75rem",marginBottom:"1rem"}}>
+            <input type="text" value={localUrl} onChange={e=>setLocalUrl(e.target.value)} placeholder="https://n8n-n8n.qo5kbx.easypanel.host"
+              style={{flex:1,background:"#0f172a",border:"1px solid #4f46e5",borderRadius:"1rem",padding:"0.75rem 1rem",fontSize:"0.8rem",fontWeight:700,color:"white",outline:"none"}}/>
+            <button onClick={()=>{saveN8nUrl(localUrl.replace(/\/$/,""));addLog("✓ URL guardada","ok");}} style={{padding:"0.75rem 1.5rem",background:"#4f46e5",borderRadius:"1rem",fontSize:"0.7rem",fontWeight:900,color:"white"}}>Guardar</button>
+            <button onClick={testCors} style={{padding:"0.75rem 1.25rem",background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:"1rem",fontSize:"0.7rem",fontWeight:900,color:"#818cf8"}}>Test CORS</button>
+          </div>
+        </div>
+
+        <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:"2rem",padding:"1.5rem"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"1rem"}}>
+            <Ico d={ICONS.alert} size={16} color="#ef4444"/>
+            <h3 style={{fontSize:"0.65rem",fontWeight:900,color:"#ef4444",textTransform:"uppercase"}}>Variables de entorno — EasyPanel → n8n → Environment</h3>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:"0.4rem"}}>
+            {[["WEBHOOK_CORS_ALLOWED_ORIGINS","*"],["WEBHOOK_CORS_ALLOWED_METHODS","GET,HEAD,POST,PUT,DELETE,OPTIONS"],["WEBHOOK_CORS_ALLOWED_HEADERS","Content-Type,Authorization,X-Requested-With,Accept"],["N8N_EXPRESS_TRUST_PROXY","true"]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",gap:"0.75rem",alignItems:"center",background:"rgba(0,0,0,0.5)",borderRadius:"0.875rem",padding:"0.5rem 1rem",border:"1px solid #1e293b",fontFamily:"monospace"}}>
+                <code style={{fontSize:"0.7rem",fontWeight:900,color:"#f59e0b",minWidth:280}}>{k}</code>
+                <code style={{fontSize:"0.7rem",color:"#10b981"}}>{v}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid #1e293b",borderRadius:"2rem",padding:"1.5rem"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.875rem"}}>
+            <h3 style={{fontSize:"0.65rem",fontWeight:900,color:"#475569",textTransform:"uppercase",letterSpacing:"0.15em"}}>Log de conexión</h3>
+            <div style={{display:"flex",gap:"0.5rem"}}>
+              <button onClick={testIncoming} style={{padding:"0.5rem 1rem",background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:"0.75rem",fontSize:"0.6rem",fontWeight:900,color:"#818cf8"}}>▶ Test datos</button>
+              <button onClick={()=>setN8nLog([])} style={{padding:"0.5rem 1rem",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:"0.75rem",fontSize:"0.6rem",fontWeight:900,color:"#ef4444"}}>Limpiar</button>
+            </div>
+          </div>
+          <div style={{background:"#010103",borderRadius:"1.25rem",padding:"0.875rem",border:"1px solid #0f172a",fontFamily:"monospace",fontSize:"0.65rem",height:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:"0.25rem"}}>
+            {n8nLog.length===0
+              ?<span style={{color:"#1e293b"}}>Sin actividad — pulsa "Cargar desde n8n" o "Test datos"</span>
+              :n8nLog.map((l,i)=>(
+                <div key={i} style={{display:"flex",gap:"0.75rem",color:l.type==="error"?"#ef4444":l.type==="ok"?"#10b981":"#64748b"}}>
+                  <span style={{flexShrink:0,color:"#1e293b"}}>{l.ts}</span>
+                  <span>{l.msg}</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return(
+    <div style={{padding:"1rem"}}>
+      {/* NAV */}
+      <nav style={{background:"rgba(10,10,18,0.85)",backdropFilter:"blur(20px)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:"2rem",padding:"0.75rem 1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"2rem",position:"sticky",top:"1rem",zIndex:50,boxShadow:"0 8px 40px rgba(0,0,0,0.5)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <Ico d={ICONS.truck} size={22} color="#6366f1"/>
+          <span style={{fontSize:"1.2rem",fontWeight:900,letterSpacing:"-0.05em",color:"white"}}>Logistic <span style={{color:"#6366f1",fontSize:"1.35rem"}}>PRO</span></span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.4rem 0.875rem",background:"rgba(0,0,0,0.4)",border:`1px solid ${n8nStatus==="ok"?"rgba(16,185,129,0.4)":n8nStatus==="err"?"rgba(239,68,68,0.4)":"rgba(255,255,255,0.07)"}`,borderRadius:"9999px"}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:n8nStatus==="ok"?"#10b981":n8nStatus==="err"?"#ef4444":"#334155",boxShadow:n8nStatus==="ok"?"0 0 6px #10b981":n8nStatus==="err"?"0 0 6px #ef4444":"none"}}/>
+            <span style={{fontSize:"0.58rem",fontWeight:800,color:n8nStatus==="ok"?"#10b981":n8nStatus==="err"?"#ef4444":"#334155",textTransform:"uppercase",letterSpacing:"0.15em"}}>
+              {n8nStatus==="ok"?"n8n OK":n8nStatus==="err"?"n8n ERROR":"n8n en espera"}
+            </span>
+          </div>
+          <div style={{display:"flex",background:"rgba(0,0,0,0.5)",padding:"0.375rem",borderRadius:"1rem",border:"1px solid rgba(255,255,255,0.05)",gap:"0.25rem"}}>
+            {[{k:"dashboard",l:"Dashboard",i:ICONS.layout},{k:"strategy",l:"Estrategia",i:ICONS.shield},{k:"n8n",l:"n8n",i:ICONS.settings}].map(({k,l,i})=>(
+              <button key={k} onClick={()=>setView(k)} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.625rem 1.25rem",borderRadius:"0.75rem",fontSize:"0.7rem",fontWeight:800,textTransform:"uppercase",letterSpacing:"0.08em",background:view===k?"white":"transparent",color:view===k?"black":"#64748b"}}>
+                <Ico d={i} size={15} color={view===k?"black":"#64748b"}/><span>{l}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+
+      {view==="strategy"&&<StrategyView/>}
+      {view==="n8n"&&<N8nView/>}
+
+      {view==="dashboard"&&(
+        <div style={{maxWidth:1750,margin:"0 auto"}}>
+          <div style={{display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:"1rem",marginBottom:"2rem"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:"#10b981",boxShadow:"0 0 10px #10b981"}}/>
+              <span style={{fontSize:"0.6rem",fontWeight:800,color:"#334155",textTransform:"uppercase",letterSpacing:"0.3em"}}>Live — {new Date().toLocaleDateString("es-ES")}</span>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:"0.75rem",alignItems:"center"}}>
+              <div style={{position:"relative"}}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><path d={ICONS.search}/></svg>
+                <input type="text" placeholder="Buscar…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} style={{background:"rgba(15,23,42,0.8)",border:"1px solid #1e293b",borderRadius:"1.5rem",padding:"0.625rem 1rem 0.625rem 2.5rem",fontSize:"0.75rem",fontWeight:700,outline:"none",width:220}}/>
+              </div>
+              <div style={{display:"flex",background:"rgba(15,23,42,0.8)",border:"1px solid #1e293b",borderRadius:"0.875rem",padding:"0.25rem",gap:"0.25rem"}}>
+                {[{v:7,d:ICONS.checkCircle,c:"#10b981"},{v:9,d:ICONS.alert,c:"#a855f7"},{v:6,d:ICONS.clock,c:"#f59e0b"}].map(({v,d,c})=>(
+                  <button key={v} onClick={()=>{setSelStatus(selStatus===v?null:v);setPage(1);}} style={{padding:"0.5rem",borderRadius:"0.625rem",background:selStatus===v?c+"33":"transparent"}}>
+                    <Ico d={d} size={16} color={selStatus===v?c:"#475569"}/>
+                  </button>
+                ))}
+              </div>
+              <button onClick={()=>setShowUpload(true)} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.625rem 1.25rem",background:"rgba(15,23,42,0.8)",border:"1px solid #1e293b",borderRadius:"1.5rem",fontSize:"0.7rem",fontWeight:800,color:"#64748b"}}>
+                <Ico d={ICONS.upload} size={15} color="#64748b"/>CSV
+              </button>
+              <button onClick={()=>{setData([]);setSelDriver("TODOS");setPage(1);setN8nStatus(null);setN8nError("");}} style={{padding:"0.625rem",background:"rgba(15,23,42,0.8)",border:"1px solid #1e293b",borderRadius:"0.875rem"}}>
+                <Ico d={ICONS.trash} size={17} color="#ef4444"/>
+              </button>
+              <button onClick={pullAllSheets} disabled={n8nLoading} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.75rem 1.75rem",background:n8nUrl?"white":"rgba(255,255,255,0.1)",color:n8nUrl?"#0f0f15":"#475569",borderRadius:"1.5rem",fontSize:"0.7rem",fontWeight:900,textTransform:"uppercase",opacity:n8nLoading?0.6:1}}>
+                {n8nLoading?<><Ico d={ICONS.clock} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargando…</>:<><Ico d={ICONS.zap} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargar desde n8n</>}
+              </button>
+            </div>
+          </div>
+
+          {n8nError&&(
+            <div style={{display:"flex",alignItems:"flex-start",gap:"0.75rem",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"1.25rem",padding:"0.875rem 1.25rem",marginBottom:"1.5rem"}}>
+              <Ico d={ICONS.alert} size={18} color="#ef4444"/>
+              <div style={{flex:1}}>
+                <p style={{fontSize:"0.7rem",fontWeight:800,color:"#ef4444",marginBottom:"0.25rem"}}>Error de conexión</p>
+                <p style={{fontSize:"0.65rem",color:"#94a3b8",lineHeight:1.5}}>{n8nError}</p>
+                <button onClick={()=>setView("n8n")} style={{marginTop:"0.5rem",padding:"0.375rem 0.875rem",background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:"0.5rem",fontSize:"0.6rem",fontWeight:900,color:"#818cf8"}}>Ver configuración n8n →</button>
+              </div>
+              <button onClick={()=>setN8nError("")} style={{color:"#64748b",flexShrink:0}}><Ico d={ICONS.x} size={15}/></button>
+            </div>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"1rem",marginBottom:"2rem"}}>
+            {[{l:"Expediciones",v:kpi.total,c:"white",i:ICONS.package},{l:"Tasa Éxito",v:kpi.rate+"%",c:"#10b981",i:ICONS.trendUp},{l:"Premium",v:kpi.premium,c:"#f59e0b",i:ICONS.zap},{l:"Incidencias",v:kpi.err,c:"#ef4444",i:ICONS.alert}].map((k,i)=>(
+              <div key={i} style={{background:"rgba(15,23,42,0.5)",border:"1px solid #1e293b",borderRadius:"2rem",padding:"1.5rem",position:"relative",overflow:"hidden"}}>
+                <svg width={80} height={80} viewBox="0 0 24 24" fill="none" stroke={k.c} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" style={{position:"absolute",right:-10,bottom:-10,opacity:0.07}}><path d={k.i}/></svg>
+                <p style={{fontSize:"0.58rem",fontWeight:800,color:"#334155",textTransform:"uppercase",letterSpacing:"0.25em",marginBottom:"0.75rem"}}>{k.l}</p>
+                <div style={{fontSize:"2.5rem",fontWeight:900,color:k.c,letterSpacing:"-0.04em",lineHeight:1}}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{marginBottom:"2rem"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"0.625rem"}}>
+              <div onClick={()=>setSelDriver("TODOS")} style={{padding:"1rem",borderRadius:"1.5rem",border:`1px solid ${selDriver==="TODOS"?"#6366f1":"#1e293b"}`,background:selDriver==="TODOS"?"rgba(99,102,241,0.2)":"rgba(15,23,42,0.4)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:"0.5rem"}}>
+                <Ico d={ICONS.db} size={26} color={selDriver==="TODOS"?"white":"#334155"}/>
+                <span style={{fontSize:"0.6rem",fontWeight:900,textTransform:"uppercase",color:"#64748b",textAlign:"center"}}>Toda la flota</span>
+              </div>
+              {DRIVERS.map(name=>{
+                const s=driverStats[name]||{total:0,ok:0,alerts:0,premium:0};
+                const pct=s.total?Math.round(s.ok/s.total*100):0;
+                const isSel=selDriver===name;
+                return(
+                  <div key={name} onClick={()=>setSelDriver(isSel?"TODOS":name)} style={{padding:"0.875rem",borderRadius:"1.5rem",border:`1px solid ${isSel?"#6366f1":"#1e293b"}`,background:isSel?"rgba(99,102,241,0.2)":"rgba(15,23,42,0.4)",cursor:"pointer",transform:isSel?"scale(1.03)":"none"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.5rem"}}>
+                      <div style={{padding:"0.3rem",borderRadius:"0.4rem",background:isSel?"white":"#1e293b",display:"flex"}}><Ico d={isSel?ICONS.check:ICONS.user} size={12} color={isSel?"#4f46e5":"#475569"} stroke={isSel?3:2}/></div>
+                      <span style={{fontSize:"1.2rem",fontWeight:900,color:"white"}}>{s.total}</span>
+                    </div>
+                    <p style={{fontSize:"0.58rem",fontWeight:900,textTransform:"uppercase",color:isSel?"white":"#475569",marginBottom:"0.5rem",lineHeight:1.2}}>{name}</p>
+                    <div style={{height:3,background:"rgba(0,0,0,0.5)",borderRadius:9999,overflow:"hidden",marginBottom:"0.4rem"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:pct>85?"#10b981":"#6366f1",borderRadius:9999}}/>
+                    </div>
+                    <div style={{display:"flex",gap:"0.3rem",flexWrap:"wrap"}}>
+                      {s.alerts>0&&<span style={{background:"rgba(239,68,68,0.2)",color:"#ef4444",fontSize:"0.55rem",fontWeight:900,padding:"0.1rem 0.35rem",borderRadius:"0.35rem"}}>⚠{s.alerts}</span>}
+                      {s.premium>0&&<span style={{background:"rgba(245,158,11,0.2)",color:"#f59e0b",fontSize:"0.55rem",fontWeight:900,padding:"0.1rem 0.35rem",borderRadius:"0.35rem"}}>★{s.premium}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 360px",gap:"1.5rem",alignItems:"start"}}>
+            <div style={{background:"rgba(9,9,15,0.6)",border:"1px solid #1e293b",borderRadius:"2.5rem",overflow:"hidden"}}>
+              <div style={{padding:"1.25rem 1.75rem",borderBottom:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(0,0,0,0.2)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"0.875rem"}}>
+                  <div style={{padding:"0.625rem",borderRadius:"0.875rem",background:selDriver!=="TODOS"?"#4f46e5":"#1e293b"}}><Ico d={ICONS.fileText} size={18} color={selDriver!=="TODOS"?"white":"#475569"}/></div>
+                  <div>
+                    <h3 style={{fontSize:"1rem",fontWeight:900,color:"white",textTransform:"uppercase"}}>Hoja: <span style={{color:"#818cf8"}}>{selDriver}</span></h3>
+                    <p style={{fontSize:"0.6rem",color:"#334155",fontWeight:700}}>{filtered.length} expediciones</p>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{padding:"0.375rem",background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.5rem",color:"#64748b",opacity:page===1?0.3:1}}><Ico d={ICONS.chevL} size={15}/></button>
+                  <span style={{fontSize:"0.6rem",fontWeight:900,color:"#475569",padding:"0 0.5rem"}}>{page}/{totalPages}</span>
+                  <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} style={{padding:"0.375rem",background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.5rem",color:"#64748b",opacity:page===totalPages?0.3:1}}><Ico d={ICONS.chevR} size={15}/></button>
+                </div>
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead>
+                    <tr style={{background:"rgba(0,0,0,0.3)",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                      {["ID","Dirección","F. Prevista","Servicio","Situación",""].map((h,i)=>(
+                        <th key={i} style={{padding:"0.875rem 1.25rem",fontSize:"0.58rem",fontWeight:900,textTransform:"uppercase",letterSpacing:"0.18em",color:i===0?"#6366f1":"#334155",textAlign:i>3?"center":"left",whiteSpace:"nowrap"}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map(item=>(
+                      <tr key={item.id} style={{borderBottom:"1px solid rgba(255,255,255,0.03)",background:item.isPremium?"rgba(245,158,11,0.03)":"transparent"}}>
+                        <td style={{padding:"0.875rem 1.25rem",fontFamily:"monospace",fontWeight:900,fontSize:"0.72rem",color:"#818cf8",whiteSpace:"nowrap"}}>{item.id}</td>
+                        <td style={{padding:"0.875rem 1.25rem"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.2rem",flexWrap:"wrap"}}>
+                            <span style={{fontWeight:900,fontSize:"0.85rem",color:"white",textTransform:"uppercase"}}>{item.direccion}</span>
+                            {item.tieneNota&&<button onClick={()=>setNoteText(item.nota)} style={{padding:"0.15rem 0.4rem",background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:"0.35rem",color:"#f59e0b",fontSize:"0.6rem"}}>📝</button>}
+                            {isUrgent(item.fPrevista)&&<span style={{width:18,height:18,borderRadius:"50%",background:"#10b981",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:"0.55rem",fontWeight:900,color:"white",flexShrink:0}}>H</span>}
+                          </div>
+                          <div style={{fontSize:"0.65rem",color:"#334155",fontWeight:700,textTransform:"uppercase"}}>{item.localidad} ({item.cp})</div>
+                        </td>
+                        <td style={{padding:"0.875rem 1.25rem",fontSize:"0.65rem",fontWeight:700,color:"#475569",fontStyle:"italic",whiteSpace:"nowrap"}}>{item.fPrevista}</td>
+                        <td style={{padding:"0.875rem 1.25rem",textAlign:"center"}}>
+                          <span style={{padding:"0.25rem 0.75rem",borderRadius:"9999px",fontSize:"0.62rem",fontWeight:900,color:item.srvColor,background:item.srvColor+"22",border:`1px solid ${item.srvColor}44`,whiteSpace:"nowrap"}}>{item.srvLabel}</span>
+                        </td>
+                        <td style={{padding:"0.875rem 1.25rem",textAlign:"center"}}><StatusBadge estado={item.estado}/></td>
+                        <td style={{padding:"0.875rem 1.25rem",textAlign:"center"}}>
+                          <button onClick={()=>setDetailItem(item)} style={{padding:"0.5rem",background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.625rem",color:"#64748b"}}><Ico d={ICONS.eye} size={15}/></button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!filtered.length&&<tr><td colSpan={6} style={{padding:"5rem 2rem",textAlign:"center",color:"#1e293b",fontWeight:900,fontSize:"0.7rem",textTransform:"uppercase",letterSpacing:"0.4em"}}>Sin expediciones cargadas</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{padding:"0.875rem 1.75rem",borderTop:"1px solid rgba(255,255,255,0.04)",display:"flex",justifyContent:"center",gap:"0.5rem",alignItems:"center",background:"rgba(0,0,0,0.2)"}}>
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{padding:"0.375rem",background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.5rem",color:"#64748b",opacity:page===1?0.3:1}}><Ico d={ICONS.chevL} size={15}/></button>
+                <span style={{fontSize:"0.6rem",fontWeight:900,color:"#475569",padding:"0 0.75rem"}}>{page}/{totalPages}</span>
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} style={{padding:"0.375rem",background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.5rem",color:"#64748b",opacity:page===totalPages?0.3:1}}><Ico d={ICONS.chevR} size={15}/></button>
+              </div>
+            </div>
+
+            <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+              <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid #1e293b",borderRadius:"2rem",display:"flex",flexDirection:"column",height:400,overflow:"hidden"}}>
+                <div style={{padding:"0.875rem 1.25rem",borderBottom:"1px solid rgba(255,255,255,0.04)",background:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",gap:"0.625rem"}}>
+                  <div style={{padding:"0.4rem",background:"#4f46e5",borderRadius:"0.625rem",display:"flex"}}><Ico d={ICONS.brain} size={15} color="white"/></div>
+                  <span style={{fontSize:"0.62rem",fontWeight:900,textTransform:"uppercase",letterSpacing:"0.12em",color:"white"}}>Controlador IA</span>
+                </div>
+                <div style={{flex:1,overflowY:"auto",padding:"0.875rem",display:"flex",flexDirection:"column",gap:"0.625rem"}}>
+                  {messages.map((m,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+                      <div style={{maxWidth:"90%",display:"flex",flexDirection:"column",gap:"0.4rem"}}>
+                        <div style={{padding:"0.625rem 0.875rem",borderRadius:m.role==="user"?"1.25rem 1.25rem 0.25rem 1.25rem":"1.25rem 1.25rem 1.25rem 0.25rem",fontSize:"0.7rem",lineHeight:1.5,fontWeight:600,background:m.role==="user"?"#4f46e5":"#1e293b",color:m.role==="user"?"white":"#cbd5e1",whiteSpace:"pre-wrap"}}>{m.text}</div>
+                        {m.accion&&<div style={{padding:"0.4rem 0.75rem",background:"rgba(16,185,129,0.15)",border:"1px solid rgba(16,185,129,0.3)",borderRadius:"0.75rem",fontSize:"0.62rem",fontWeight:800,color:"#10b981"}}>✓ {m.accion.count} exp. → {m.accion.destino}</div>}
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping&&<div style={{fontSize:"0.6rem",color:"#6366f1",fontWeight:800,fontStyle:"italic"}}>Analizando…</div>}
+                  <div ref={chatEndRef}/>
+                </div>
+                <div style={{padding:"0.625rem",borderTop:"1px solid rgba(255,255,255,0.04)",background:"rgba(0,0,0,0.3)",display:"flex",gap:"0.5rem"}}>
+                  <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleChat()} placeholder="Pregunta sobre los repartos..." style={{flex:1,background:"#0f172a",border:"1px solid #1e293b",borderRadius:"0.75rem",padding:"0.5rem 0.75rem",fontSize:"0.68rem",fontWeight:700,outline:"none"}}/>
+                  <button onClick={handleChat} style={{padding:"0.5rem",background:"#4f46e5",borderRadius:"0.75rem",display:"flex",flexShrink:0}}><Ico d={ICONS.send} size={15} color="white"/></button>
+                </div>
+              </div>
+              <div style={{background:"rgba(9,9,15,0.7)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:"2rem",padding:"1.25rem"}}>
+                <h3 style={{fontSize:"0.6rem",fontWeight:900,textTransform:"uppercase",color:"#334155",marginBottom:"0.875rem",letterSpacing:"0.15em"}}>Resumen por Servicio</h3>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.625rem"}}>
+                  {Object.entries(SERVICE_MAP).map(([code,s])=>{
+                    const cnt=filtered.filter(d=>d.srvCode===code).length;
+                    if(!cnt) return null;
+                    return(
+                      <div key={code} style={{background:"rgba(0,0,0,0.4)",borderRadius:"1rem",padding:"0.75rem",border:`1px solid ${s.color}22`}}>
+                        <div style={{fontSize:"0.58rem",fontWeight:900,color:s.color,textTransform:"uppercase",marginBottom:"0.25rem"}}>{s.label}</div>
+                        <div style={{fontSize:"1.5rem",fontWeight:900,color:"white"}}>{cnt}</div>
+                      </div>
+                    );
+                  })}
+                  {!filtered.length&&<div style={{gridColumn:"1/-1",textAlign:"center",color:"#1e293b",fontSize:"0.65rem",fontWeight:800,padding:"1rem"}}>Sin datos</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUpload&&<UploadModal onClose={()=>setShowUpload(false)} onImport={handleImport}/>}
+      {detailItem&&<DetailPanel item={detailItem} onClose={()=>setDetailItem(null)}/>}
+      {noteText&&(
+        <div style={{position:"fixed",inset:0,zIndex:80,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)"}} onClick={()=>setNoteText(null)}/>
+          <div style={{position:"relative",width:"100%",maxWidth:380,background:"#0f0f15",border:"1px solid rgba(245,158,11,0.3)",borderRadius:"2rem",overflow:"hidden"}}>
+            <div style={{padding:"1.25rem 1.5rem",borderBottom:"1px solid rgba(255,255,255,0.05)",display:"flex",gap:"0.75rem",alignItems:"center",background:"rgba(245,158,11,0.05)"}}>
+              <Ico d={ICONS.msg} size={18} color="#f59e0b"/>
+              <h3 style={{fontSize:"0.72rem",fontWeight:900,color:"white",textTransform:"uppercase"}}>Nota del Envío</h3>
+            </div>
+            <div style={{padding:"1.5rem"}}><p style={{color:"#94a3b8",fontSize:"0.82rem",lineHeight:1.6,fontStyle:"italic"}}>"{noteText}"</p></div>
+            <div style={{padding:"1rem",display:"flex",justifyContent:"flex-end",background:"rgba(0,0,0,0.2)"}}>
+              <button onClick={()=>setNoteText(null)} style={{padding:"0.5rem 1.5rem",background:"#f59e0b",color:"black",fontWeight:900,fontSize:"0.65rem",textTransform:"uppercase",borderRadius:"0.75rem"}}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer style={{marginTop:"3rem",paddingTop:"1.5rem",borderTop:"1px solid #1e293b",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:"0.58rem",fontWeight:900,color:"#1e293b",textTransform:"uppercase",letterSpacing:"0.4em"}}>
+        <span>Logistic PRO v9.3</span>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
