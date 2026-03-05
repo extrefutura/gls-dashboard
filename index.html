@@ -128,6 +128,8 @@ const isUrgent = fp => {
   const now=new Date(); now.setHours(0,0,0,0); return dt<=now;
 };
 
+const proxyFetch = url => fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
+
 function App() {
   const [view,setView]=useState("dashboard");
   const [data,setData]=useState([]);
@@ -163,14 +165,14 @@ function App() {
     setN8nLoading(true);setN8nError("");addLog("Iniciando carga desde n8n...");
     try{
       addLog(`GET ${n8nUrl}/webhook/gls-sheets`);
-      const r=await fetch(`${n8nUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+      const r=await proxyFetch(`${n8nUrl}/webhook/gls-sheets`);
       if(!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
       const sd=await r.json();
       const hojas=sd.repartidores||[];
       addLog(`✓ ${hojas.length} hojas encontradas`,"ok");
       if(!hojas.length) throw new Error("No hay hojas asignadas en GLS Atlas hoy.");
       addLog(`Descargando Excel de ${hojas.length} hojas en una sola llamada...`);
-      const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+      const re=await proxyFetch(`${n8nUrl}/webhook/gls-excel`);
       if(!re.ok) throw new Error(`HTTP ${re.status} — ${re.statusText}`);
       const rd=await re.json();
       const allEnvios=rd.envios||[];
@@ -184,8 +186,8 @@ function App() {
       setN8nStatus("err");
       let msg=e.message||"Error desconocido";
       if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")){
-        msg="CORS bloqueado — Aplica las variables de entorno en EasyPanel y reinicia n8n.";
-        addLog("→ Variables necesarias: WEBHOOK_CORS_ALLOWED_ORIGINS=*","error");
+        msg="Error de red — Verifica que n8n-proxy.php está en el hosting y que n8n está accesible.";
+        addLog("→ Comprueba que n8n-proxy.php existe en el servidor","error");
       }
       setN8nError(msg);addLog(`✗ ${msg}`,"error");
     }
@@ -195,7 +197,7 @@ function App() {
   const pullEstados=async()=>{
     if(!n8nUrl||!data.length) return;
     try{
-      const r=await fetch(`${n8nUrl}/webhook/gls-estados`,{mode:"cors"});
+      const r=await proxyFetch(`${n8nUrl}/webhook/gls-estados`);
       if(!r.ok) return;
       const updates=await r.json();
       if(!Array.isArray(updates)||!updates.length) return;
@@ -506,8 +508,8 @@ function App() {
       if(!localUrl) return;
       addLog(`Probando CORS → ${localUrl}/webhook/gls-sheets`);
       try{
-        const r=await fetch(`${localUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
-        addLog(`✓ HTTP ${r.status} — CORS OK`,"ok");
+        const r=await proxyFetch(`${localUrl}/webhook/gls-sheets`);
+        addLog(`✓ HTTP ${r.status} — Proxy OK`,"ok");
       }catch(e){addLog(`✗ CORS bloqueado: ${e.message} — Aplica las variables en EasyPanel`,"error");}
     };
     const testIncoming=()=>{
