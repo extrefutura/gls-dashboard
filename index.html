@@ -120,16 +120,8 @@ const processCSV = (text) => {
   return out;
 };
 
-// Fetch con fallback: intenta directo (n8n tiene CORS configurado),
-// si falla prueba el proxy PHP (hosting compartido sin CORS)
-const proxyFetch = async url => {
-  try {
-    const r = await fetch(url, {headers:{"Accept":"application/json"}});
-    return r;
-  } catch(e) {
-    return fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
-  }
-};
+// Todas las llamadas a n8n van por el proxy PHP (evita CORS)
+const proxyFetch = url => fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
 
 const isUrgent = fp => {
   if(!fp||fp==="--/--/--") return false;
