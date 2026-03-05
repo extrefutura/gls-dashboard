@@ -4,51 +4,6 @@
     {
       "parameters": {
         "httpMethod": "GET",
-        "path": "gls-sheets",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "aa11bb22-cc33-dd44-ee55-ff6677889900",
-      "name": "Webhook gls-sheets",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        100,
-        100
-      ],
-      "webhookId": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5"
-    },
-    {
-      "parameters": {
-        "jsCode": "const axios=require('axios');\nconst BASE='https://atlas.gls-spain.es';\nconst GLS_USER=$env.GLS_USER||'';\nconst GLS_PASS=$env.GLS_PASS||'';\nconst jar={};\nfunction sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}\nfunction ch(){return Object.values(jar).join('; ');}\nasync function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h},_rd+1);}return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}\nfunction csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\n\nconst r1=await req('GET',BASE+'/Account/Login');\nconst c1=csrf(r1.body);\n\nconst r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});\nif(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas. Revisa GLS_USER y GLS_PASS.');\n\nconst r3=await req('GET',BASE+'/delivery/index');\nif(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('delivery/index devuelve login — sesión no autenticada');\nconst c2=csrf(r3.body);\n\nconst hoy=new Date();\nconst fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();\n\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)))+'&filters%5Buntil%5D='+encodeURIComponent(fmt(hoy))});\nlet raw=r4.body;\ntry{raw=JSON.parse(raw);}catch(e){}\n\nconst arr=(raw&&raw.Data&&raw.Data.List)||(raw&&raw.data)||(raw&&raw.sheets)||(raw&&raw.hojas)||(raw&&raw.repartidores)||(Array.isArray(raw)?raw:[]);\nconst repartidores=arr.filter(s=>s.SheetCode!=null&&s.DealerCode&&s.DealerCode<9000).map(s=>({nombre:s.Dealer||s.nombre||s.name||s.Name||s.driverName||s.Conductor||'Sin nombre',sheetCode:String(s.SheetCode||s.sheetCode||s.id||s.Id||''),placeCode:String(s.PlaceCode||s.placeCode||s.cp||s.postalCode||'')}));\n\nreturn [{json:{repartidores:repartidores,_status:r4.status,_raw:raw,_debug:{r1:r1.status,r2:r2.status,r3:r3.status}}}];"
-      },
-      "id": "bb22cc33-dd44-ee55-ff66-778899001122",
-      "name": "Auth + GetSummarySheets",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        380,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
-      },
-      "id": "cc33dd44-ee55-ff66-7788-990011223344",
-      "name": "Respond gls-sheets",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [
-        660,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "httpMethod": "GET",
         "path": "gls-excel",
         "responseMode": "responseNode",
         "options": {}
@@ -57,24 +12,18 @@
       "name": "Webhook gls-excel",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        100,
-        360
-      ],
+      "position": [100, 100],
       "webhookId": "b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f6"
     },
     {
       "parameters": {
-        "jsCode": "const axios=require('axios');let XLSX;try{XLSX=require('xlsx');}catch(e){XLSX=null;}const BASE='https://atlas.gls-spain.es';const GLS_USER=$env.GLS_USER||'';const GLS_PASS=$env.GLS_PASS||'';const jar={};function sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}function ch(){return Object.values(jar).join('; ');}async function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const binary=!!(opts||{}).binary;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:binary?'arraybuffer':'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h,binary:binary},_rd+1);}if(binary)return{status:res.status,ct:res.headers['content-type']||'',data:Buffer.from(res.data)};return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}function csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\nconst hoy=new Date();const fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();const fDesde=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1));const fHasta=fmt(hoy);\n// 1. Autenticar\nconst r1=await req('GET',BASE+'/Account/Login');const c1=csrf(r1.body);const r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});if(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas');\n// 2. delivery/index para CSRF\nconst r3=await req('GET',BASE+'/delivery/index');if(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('Sesión no válida tras login');const c2=csrf(r3.body);\n// 3. Obtener todas las hojas\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let sheetsRaw=r4.body;try{sheetsRaw=JSON.parse(sheetsRaw);}catch(e){}const hojas=((sheetsRaw&&sheetsRaw.Data&&sheetsRaw.Data.List)||[]).filter(s=>s.SheetCode!=null&&s.DealerCode&&s.DealerCode<9000);\nconst SERVICE_MAP={'10':{label:'10 HORAS',color:'#ef4444',premium:true},'96':{label:'24 HORAS',color:'#10b981',premium:false},'97':{label:'ECONOMY',color:'#6366f1',premium:false},'22':{label:'PARCEL',color:'#f59e0b',premium:false}};const enviosTodos=[];const errores=[];\n// 4. Por cada hoja: intentar Excel, fallback a GetDeliveryItems JSON\nfor(const hoja of hojas){try{// Intentar descarga Excel\nconst rXls=await req('POST',BASE+'/delivery/ExportDeliverySheet',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta),binary:true});const ct=(rXls.ct||'').toLowerCase();const isXls=ct.includes('spreadsheet')||ct.includes('excel')||ct.includes('openxmlformats')||ct.includes('octet-stream');if(rXls.status===200&&isXls&&XLSX&&rXls.data&&rXls.data.length>100){// Parsear Excel\nconst wb=XLSX.read(rXls.data,{type:'buffer'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});for(const row of rows){const k={};for(const key of Object.keys(row)){const norm=key.toLowerCase().replace(/\\s+/g,'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');k[norm]=row[key];}const codexp=String(k['codexp']||k['codigoenvio']||k['nenvio']||k['expedicion']||'').trim();if(!codexp)continue;const srvCode=String(k['servicio']||k['codservicio']||k['tiposervicio']||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:codexp,conductor:hoja.Dealer,cliente:String(k['destinatario']||k['cliente']||''),direccion:String(k['direccion']||k['domicilio']||''),localidad:String(k['localidad']||k['poblacion']||''),cp:String(k['cp']||k['codigopostal']||String(hoja.PlaceCode)||''),estado:parseInt(k['estado']||k['eventococigo']||6)||6,bultos:parseInt(k['bultos']||1)||1,kgs:parseFloat(k['kgs']||k['peso']||0)||0,fPrevista:String(k['fprevista']||k['fechaprevista']||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(k['nota']||k['observaciones']||''),tieneNota:!!(k['nota']||k['observaciones'])});}}else{// Fallback: GetDeliveryItems JSON\nconst rJ=await req('POST',BASE+'/delivery/GetDeliveryItems',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let jRaw=rJ.body;try{jRaw=JSON.parse(jRaw);}catch(e){}const items=(jRaw&&jRaw.Data&&jRaw.Data.List)||(Array.isArray(jRaw)?jRaw:[]);for(const i of items){const srvCode=String(i.srvCode||i.ServCode||i.CodServicio||i.ServiceCode||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:String(i.codexp||i.CodExp||i.Codexp||i.Id||''),conductor:hoja.Dealer,cliente:String(i.destinatario||i.Destinatario||''),direccion:String(i.direccion||i.Direccion||''),localidad:String(i.localidad||i.Localidad||''),cp:String(i.cp||i.CP||String(hoja.PlaceCode)||''),estado:parseInt(i.eventoCodigo||i.EventoCodigo||i.Status||6)||6,bultos:parseInt(i.bultos||i.Bultos||1)||1,kgs:parseFloat(i.kgs||i.Kgs||0)||0,fPrevista:String(i.fPrevista||i.FPrevista||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(i.nota||i.Nota||''),tieneNota:!!(i.nota||i.Nota)});}if(rXls.status!==200)errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,info:'Excel HTTP '+rXls.status+', usado JSON API, items: '+items.length});}}catch(e){errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,error:e.message});}}\nreturn [{json:{envios:enviosTodos,hojas:hojas.length,errores:errores,_debug:{sheetsStatus:r4.status,totalHojas:hojas.length,totalEnvios:enviosTodos.length,xlsxAvailable:!!XLSX}}}];"
+        "jsCode": "// GLS Atlas — login único + GetSummarySheets + ExportDeliverySheet por hoja\nconst axios = require('axios');\nlet XLSX; try { XLSX = require('xlsx'); } catch(e) { XLSX = null; }\n\nconst BASE     = 'https://atlas.gls-spain.es';\nconst GLS_USER = $env.GLS_USER || '';\nconst GLS_PASS = $env.GLS_PASS || '';\n\n// ── Cookie jar ──────────────────────────────────────────────────────────────\nconst jar = {};\nfunction saveCookies(headers) {\n  const raw = headers['set-cookie'] || [];\n  for (const c of (Array.isArray(raw) ? raw : [raw])) {\n    if (!c) continue;\n    const pair = c.split(';')[0].trim();\n    const eq   = pair.indexOf('=');\n    if (eq > 0) jar[pair.substring(0, eq).trim()] = pair;\n  }\n}\nfunction cookieHeader() { return Object.values(jar).join('; '); }\n\n// ── HTTP helper con redirect manual ─────────────────────────────────────────\nasync function req(method, url, opts, depth) {\n  depth = depth || 0;\n  if (depth > 12) throw new Error('Demasiadas redirecciones');\n  const extra   = opts || {};\n  const binary  = !!extra.binary;\n  const headers = Object.assign({ 'User-Agent': 'Mozilla/5.0' }, extra.h || {});\n  const ck = cookieHeader();\n  if (ck) headers['Cookie'] = ck;\n\n  const res = await axios.request({\n    method,\n    url,\n    headers,\n    data: extra.body || null,\n    maxRedirects: 0,\n    validateStatus: () => true,\n    responseType: binary ? 'arraybuffer' : 'text'\n  });\n  saveCookies(res.headers);\n\n  if ([301,302,303,307,308].includes(res.status)) {\n    const loc  = res.headers.location || '';\n    const next = loc.startsWith('http') ? loc : BASE + loc;\n    const meth = [301,302,303].includes(res.status) ? 'GET' : method;\n    return req(meth, next, { h: extra.h || {}, binary }, depth + 1);\n  }\n  if (binary) return { status: res.status, ct: res.headers['content-type'] || '', data: Buffer.from(res.data) };\n  return { status: res.status, body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };\n}\n\nfunction csrf(html) {\n  const m = html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);\n  if (!m) throw new Error('Token CSRF no encontrado');\n  return m[1];\n}\n\nconst hoy  = new Date();\nconst fmt  = d => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();\nconst desde = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1));\nconst hasta  = fmt(hoy);\n\n// ── 1. Login ─────────────────────────────────────────────────────────────────\nconst rLogin = await req('GET', BASE + '/Account/Login');\nconst csrf1  = csrf(rLogin.body);\nconst rPost  = await req('POST', BASE + '/Account/Login', {\n  h: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': BASE + '/Account/Login' },\n  body: 'Username=' + encodeURIComponent(GLS_USER) +\n        '&Password=' + encodeURIComponent(GLS_PASS) +\n        '&__RequestVerificationToken=' + encodeURIComponent(csrf1)\n});\nif (rPost.body.toLowerCase().includes('name=\"password\"'))\n  throw new Error('Login fallido — revisa GLS_USER y GLS_PASS en las variables de n8n');\n\n// ── 2. delivery/index → CSRF para las llamadas POST ──────────────────────────\nconst rIdx = await req('GET', BASE + '/delivery/index');\nif (rIdx.body.toLowerCase().includes('<title>sign in'))\n  throw new Error('Sesión inválida tras login');\nconst csrf2 = csrf(rIdx.body);\n\nconst postH = {\n  'Content-Type':    'application/x-www-form-urlencoded',\n  'X-Requested-With':'XMLHttpRequest',\n  'Accept':          'application/json, text/javascript, */*; q=0.01',\n  'Referer':         BASE + '/delivery/index'\n};\nconst tokenParam = '__RequestVerificationToken=' + encodeURIComponent(csrf2);\nconst dateParams = '&filters%5Bsince%5D=' + encodeURIComponent(desde) + '&filters%5Buntil%5D=' + encodeURIComponent(hasta);\n\n// ── 3. Obtener hojas del día ──────────────────────────────────────────────────\nconst rSheets = await req('POST', BASE + '/delivery/GetSummarySheets', { h: postH, body: tokenParam + dateParams });\nlet sheetsRaw = rSheets.body;\ntry { sheetsRaw = JSON.parse(sheetsRaw); } catch(e) {}\nconst hojas = ((sheetsRaw && sheetsRaw.Data && sheetsRaw.Data.List) || [])\n  .filter(s => s.SheetCode != null && s.DealerCode && s.DealerCode < 9000);\n\nif (!hojas.length) return [{ json: { envios: [], hojas: 0, errores: ['Sin hojas asignadas hoy'], _debug: { sheetsStatus: rSheets.status } } }];\n\n// ── Mapeo de servicios ────────────────────────────────────────────────────────\nconst SRV = {\n  '0':  { label:'10 HORAS',    color:'#f59e0b', premium:true  },\n  '2':  { label:'VALIJA',      color:'#f97316', premium:true  },\n  '92': { label:'PARCEL',      color:'#3b82f6', premium:false },\n  '10': { label:'RETORNO',     color:'#f97316', premium:false },\n  '37': { label:'ECONOMY',     color:'#94a3b8', premium:false },\n  '96': { label:'24 HORAS',    color:'#10b981', premium:true  },\n  '97': { label:'PARCEL',      color:'#3b82f6', premium:false },\n  '98': { label:'ENTREGA HOY', color:'#10b981', premium:true  },\n  '1':  { label:'19 HORAS',    color:'#6366f1', premium:false },\n};\nfunction srv(code) { return SRV[String(code)] || { label: String(code) || 'STD', color: '#64748b', premium: false }; }\n\nconst envios  = [];\nconst errores = [];\n\n// ── 4. Por cada hoja: Excel → fallback JSON ───────────────────────────────────\nfor (const hoja of hojas) {\n  const sheetP = '&sheetCode=' + encodeURIComponent(String(hoja.SheetCode)) +\n                 '&placeCode='  + encodeURIComponent(String(hoja.PlaceCode || ''));\n  let ok = false;\n\n  // 4a. Intentar descarga Excel\n  if (XLSX) {\n    try {\n      const rXls = await req('POST', BASE + '/delivery/ExportDeliverySheet',\n        { h: { ...postH }, body: tokenParam + sheetP + dateParams, binary: true });\n      const ct = (rXls.ct || '').toLowerCase();\n      const isXls = ct.includes('spreadsheet') || ct.includes('excel') ||\n                    ct.includes('openxmlformats') || ct.includes('octet-stream');\n      if (rXls.status === 200 && isXls && rXls.data && rXls.data.length > 100) {\n        const wb   = XLSX.read(rXls.data, { type: 'buffer' });\n        const ws   = wb.Sheets[wb.SheetNames[0]];\n        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });\n        for (const row of rows) {\n          const k = {};\n          for (const key of Object.keys(row)) {\n            const norm = key.toLowerCase().replace(/\\s+/g,'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');\n            k[norm] = row[key];\n          }\n          const id = String(k['codexp'] || k['codigoenvio'] || k['nenvio'] || '').trim();\n          if (!id) continue;\n          const srvCode = String(k['servicio'] || k['codservicio'] || k['tiposervicio'] || '96');\n          const s = srv(srvCode);\n          const nota = String(k['nota'] || k['observaciones'] || k['observ'] || '');\n          envios.push({\n            id, conductor: hoja.Dealer,\n            cliente:   String(k['destinatario'] || k['cliente'] || ''),\n            direccion: String(k['direccion']    || k['domicilio'] || ''),\n            localidad: String(k['localidad']    || k['poblacion'] || ''),\n            cp:        String(k['cp'] || k['codigopostal'] || String(hoja.PlaceCode) || ''),\n            estado:    parseInt(k['estado'] || k['eventococigo'] || 6) || 6,\n            bultos:    parseInt(k['bultos'] || 1) || 1,\n            kgs:       parseFloat(k['kgs'] || k['peso'] || 0) || 0,\n            fPrevista: String(k['fprevista'] || k['fechaprevista'] || fmt(hoy)),\n            srvCode, srvLabel: s.label, srvColor: s.color, isPremium: s.premium,\n            nota, tieneNota: nota.length > 2\n          });\n        }\n        ok = true;\n      }\n    } catch(e) {\n      errores.push({ sheetCode: hoja.SheetCode, dealer: hoja.Dealer, info: 'Excel error: ' + e.message });\n    }\n  }\n\n  // 4b. Fallback: GetDeliveryItems JSON\n  if (!ok) {\n    try {\n      const rJ = await req('POST', BASE + '/delivery/GetDeliveryItems',\n        { h: { ...postH }, body: tokenParam + sheetP + dateParams });\n      let jr = rJ.body;\n      try { jr = JSON.parse(jr); } catch(e) {}\n      const items = (jr && jr.Data && jr.Data.List) || (Array.isArray(jr) ? jr : []);\n      for (const i of items) {\n        const id = String(i.CodExp || i.codexp || i.Id || '').trim();\n        if (!id) continue;\n        const srvCode = String(i.CodServicio || i.codservicio || i.ServCode || '96');\n        const s = srv(srvCode);\n        const nota = String(i.Observ || i.observ || i.Nota || '');\n        envios.push({\n          id, conductor: hoja.Dealer,\n          cliente:   String(i.Destinatario  || i.destinatario  || ''),\n          direccion: String(i.Direccion     || i.direccion     || ''),\n          localidad: String(i.Localidad     || i.localidad     || ''),\n          cp:        String(i.CP || i.Cp || String(hoja.PlaceCode) || ''),\n          estado:    parseInt(i.EventoCodigo || i.eventoCodigo || 6) || 6,\n          bultos:    parseInt(i.Bultos || i.bultos || 1) || 1,\n          kgs:       parseFloat(i.Kgs || i.kgs || 0) || 0,\n          fPrevista: String(i.FPreviEntrega || i.fPreviEntrega || fmt(hoy)),\n          srvCode, srvLabel: s.label, srvColor: s.color, isPremium: s.premium,\n          nota, tieneNota: nota.length > 2\n        });\n      }\n      if (!ok && items.length === 0)\n        errores.push({ sheetCode: hoja.SheetCode, dealer: hoja.Dealer, info: 'Sin datos en JSON API' });\n    } catch(e) {\n      errores.push({ sheetCode: hoja.SheetCode, dealer: hoja.Dealer, error: e.message });\n    }\n  }\n}\n\nreturn [{ json: {\n  envios,\n  hojas:  hojas.length,\n  errores,\n  _debug: { total: envios.length, hojas: hojas.length, xlsxAvailable: !!XLSX }\n} }];"
       },
       "id": "ee55ff66-7788-9900-1122-334455667788",
-      "name": "Auth + GetDeliveryItems",
+      "name": "GLS Atlas — Login + Hojas + Excel",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        380,
-        360
-      ]
+      "position": [380, 100]
     },
     {
       "parameters": {
@@ -86,10 +35,7 @@
       "name": "Respond gls-excel",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        660,
-        360
-      ]
+      "position": [660, 100]
     },
     {
       "parameters": {
@@ -102,24 +48,18 @@
       "name": "Webhook gls-estados",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        100,
-        620
-      ],
+      "position": [100, 360],
       "webhookId": "c3c3c3c3-d4d4-e5e5-f6f6-a7a7a7a7a7a7"
     },
     {
       "parameters": {
-        "jsCode": "const axios=require('axios');\nconst BASE='https://atlas.gls-spain.es';\nconst GLS_USER=$env.GLS_USER||'';\nconst GLS_PASS=$env.GLS_PASS||'';\nconst jar={};\nfunction sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}\nfunction ch(){return Object.values(jar).join('; ');}\nasync function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h},_rd+1);}return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}\nfunction csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\n\nconst r1=await req('GET',BASE+'/Account/Login');\nconst c1=csrf(r1.body);\n\nconst r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});\nif(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas. Revisa GLS_USER y GLS_PASS.');\n\nconst r3=await req('GET',BASE+'/delivery/index');\nif(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('Sesión no válida');\nconst c2=csrf(r3.body);\n\nconst hoy=new Date();\nconst fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();\n\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fmt(hoy))+'&filters%5Buntil%5D='+encodeURIComponent(fmt(hoy))});\nlet raw=r4.body;\ntry{raw=JSON.parse(raw);}catch(e){}\nconst items=(raw&&raw.Data&&raw.Data.List)||(raw&&raw.data)||(raw&&raw.items)||(Array.isArray(raw)?raw:[]);\nconst updates=items.map(function(i){return{codexp:String(i.codexp||i.CodExp||i.id||i.Id||''),eventoCodigo:String(i.eventoCodigo||i.EventoCodigo||i.estado||i.Status||6)};}).filter(function(i){return i.codexp;});\n\nreturn updates.length?updates.map(function(u){return{json:u};}):[{json:{codexp:'',eventoCodigo:'0'}}];"
+        "jsCode": "// Refresca solo los estados de los envíos ya cargados (login mínimo)\nconst axios = require('axios');\nconst BASE     = 'https://atlas.gls-spain.es';\nconst GLS_USER = $env.GLS_USER || '';\nconst GLS_PASS = $env.GLS_PASS || '';\n\nconst jar = {};\nfunction saveCookies(headers) {\n  const raw = headers['set-cookie'] || [];\n  for (const c of (Array.isArray(raw) ? raw : [raw])) {\n    if (!c) continue;\n    const pair = c.split(';')[0].trim();\n    const eq   = pair.indexOf('=');\n    if (eq > 0) jar[pair.substring(0, eq).trim()] = pair;\n  }\n}\nfunction cookieHeader() { return Object.values(jar).join('; '); }\n\nasync function req(method, url, opts, depth) {\n  depth = depth || 0;\n  if (depth > 12) throw new Error('Demasiadas redirecciones');\n  const extra   = opts || {};\n  const headers = Object.assign({ 'User-Agent': 'Mozilla/5.0' }, extra.h || {});\n  const ck = cookieHeader();\n  if (ck) headers['Cookie'] = ck;\n  const res = await axios.request({\n    method, url, headers, data: extra.body || null,\n    maxRedirects: 0, validateStatus: () => true, responseType: 'text'\n  });\n  saveCookies(res.headers);\n  if ([301,302,303,307,308].includes(res.status)) {\n    const loc  = res.headers.location || '';\n    const next = loc.startsWith('http') ? loc : BASE + loc;\n    return req([301,302,303].includes(res.status) ? 'GET' : method, next, extra, depth + 1);\n  }\n  return { status: res.status, body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };\n}\nfunction csrf(html) {\n  const m = html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);\n  if (!m) throw new Error('Token CSRF no encontrado');\n  return m[1];\n}\n\nconst hoy  = new Date();\nconst fmt  = d => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();\n\nconst r1 = await req('GET', BASE + '/Account/Login');\nconst c1 = csrf(r1.body);\nconst r2 = await req('POST', BASE + '/Account/Login', {\n  h: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': BASE + '/Account/Login' },\n  body: 'Username=' + encodeURIComponent(GLS_USER) + '&Password=' + encodeURIComponent(GLS_PASS) + '&__RequestVerificationToken=' + encodeURIComponent(c1)\n});\nif (r2.body.toLowerCase().includes('name=\"password\"')) throw new Error('Login fallido');\n\nconst r3 = await req('GET', BASE + '/delivery/index');\nconst c2 = csrf(r3.body);\n\nconst r4 = await req('POST', BASE + '/delivery/GetSummarySheets', {\n  h: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json, text/javascript, */*; q=0.01', 'Referer': BASE + '/delivery/index' },\n  body: '__RequestVerificationToken=' + encodeURIComponent(c2) + '&filters%5Bsince%5D=' + encodeURIComponent(fmt(hoy)) + '&filters%5Buntil%5D=' + encodeURIComponent(fmt(hoy))\n});\nlet raw = r4.body;\ntry { raw = JSON.parse(raw); } catch(e) {}\nconst items = (raw && raw.Data && raw.Data.List) || (Array.isArray(raw) ? raw : []);\nconst updates = items\n  .map(i => ({ codexp: String(i.CodExp || i.codexp || i.Id || ''), eventoCodigo: String(i.EventoCodigo || i.eventoCodigo || 6) }))\n  .filter(i => i.codexp);\n\nreturn updates.length ? updates.map(u => ({ json: u })) : [{ json: { codexp: '', eventoCodigo: '0' } }];"
       },
       "id": "11223344-5566-7788-99aa-bbccddeeff00",
-      "name": "Auth + GetEstados",
+      "name": "GLS Atlas — Actualizar estados",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        380,
-        620
-      ]
+      "position": [380, 360]
     },
     {
       "parameters": {
@@ -130,84 +70,25 @@
       "name": "Respond gls-estados",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        660,
-        620
-      ]
+      "position": [660, 360]
     }
   ],
   "connections": {
-    "Webhook gls-sheets": {
-      "main": [
-        [
-          {
-            "node": "Auth + GetSummarySheets",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Auth + GetSummarySheets": {
-      "main": [
-        [
-          {
-            "node": "Respond gls-sheets",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Webhook gls-excel": {
-      "main": [
-        [
-          {
-            "node": "Auth + GetDeliveryItems",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "GLS Atlas — Login + Hojas + Excel", "type": "main", "index": 0 }]]
     },
-    "Auth + GetDeliveryItems": {
-      "main": [
-        [
-          {
-            "node": "Respond gls-excel",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "GLS Atlas — Login + Hojas + Excel": {
+      "main": [[{ "node": "Respond gls-excel", "type": "main", "index": 0 }]]
     },
     "Webhook gls-estados": {
-      "main": [
-        [
-          {
-            "node": "Auth + GetEstados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "GLS Atlas — Actualizar estados", "type": "main", "index": 0 }]]
     },
-    "Auth + GetEstados": {
-      "main": [
-        [
-          {
-            "node": "Respond gls-estados",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "GLS Atlas — Actualizar estados": {
+      "main": [[{ "node": "Respond gls-estados", "type": "main", "index": 0 }]]
     }
   },
   "active": true,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "id": "gls-dashboard-v2",
+  "settings": { "executionOrder": "v1" },
+  "id": "gls-dashboard-v3",
   "tags": []
 }

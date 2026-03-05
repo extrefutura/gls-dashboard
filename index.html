@@ -120,6 +120,9 @@ const processCSV = (text) => {
   return out;
 };
 
+// Todas las llamadas a n8n van por el proxy PHP (evita CORS)
+const proxyFetch = url => fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
+
 const isUrgent = fp => {
   if(!fp||fp==="--/--/--") return false;
   const p=fp.split("/"); if(p.length<3) return false;
@@ -127,8 +130,6 @@ const isUrgent = fp => {
   const dt=new Date(parseInt(year),parseInt(m)-1,parseInt(d));
   const now=new Date(); now.setHours(0,0,0,0); return dt<=now;
 };
-
-const proxyFetch = url => fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
 
 function App() {
   const [view,setView]=useState("dashboard");
@@ -162,34 +163,23 @@ function App() {
 
   const pullAllSheets=async()=>{
     if(!n8nUrl){setShowN8nConfig(true);return;}
-    setN8nLoading(true);setN8nError("");addLog("Iniciando carga desde n8n...");
+    setN8nLoading(true);setN8nError("");addLog("Conectando con GLS Atlas vía n8n...");
     try{
-      addLog(`GET ${n8nUrl}/webhook/gls-sheets`);
-      const r=await proxyFetch(`${n8nUrl}/webhook/gls-sheets`);
+      addLog(`GET ${n8nUrl}/webhook/gls-excel`);
+      const r=await proxyFetch(`${n8nUrl}/webhook/gls-excel`);
       if(!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
-      const sd=await r.json();
-      const hojas=sd.repartidores||[];
-      addLog(`✓ ${hojas.length} hojas encontradas`,"ok");
-      if(!hojas.length) throw new Error("No hay hojas asignadas en GLS Atlas hoy.");
-      addLog(`Descargando Excel de ${hojas.length} hojas en una sola llamada...`);
-      const re=await proxyFetch(`${n8nUrl}/webhook/gls-excel`);
-      if(!re.ok) throw new Error(`HTTP ${re.status} — ${re.statusText}`);
-      const rd=await re.json();
+      const rd=await r.json();
       const allEnvios=rd.envios||[];
       if(rd.errores&&rd.errores.length) rd.errores.forEach(err=>addLog(`⚠ ${err.dealer||err.sheetCode}: ${err.error||err.info}`,"error"));
-      addLog(`✓ ${rd.hojas||hojas.length} hojas descargadas — ${allEnvios.length} envíos`,"ok");
-      if(!allEnvios.length) throw new Error("No se encontraron expediciones. Comprueba la conexión con GLS Atlas.");
+      addLog(`✓ ${rd.hojas||'?'} hojas descargadas — ${allEnvios.length} envíos`,"ok");
+      if(!allEnvios.length) throw new Error("Sin expediciones. Comprueba credenciales GLS_USER/GLS_PASS en n8n.");
       setData(prev=>{const m=new Map([...prev,...allEnvios].map(x=>[x.id,x]));return[...m.values()];});
       setN8nStatus("ok");setPage(1);
       addLog(`✓ Total: ${allEnvios.length} expediciones cargadas`,"ok");
     }catch(e){
       setN8nStatus("err");
-      let msg=e.message||"Error desconocido";
-      if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")){
-        msg="Error de red — Verifica que n8n-proxy.php está en el hosting y que n8n está accesible.";
-        addLog("→ Comprueba que n8n-proxy.php existe en el servidor","error");
-      }
-      setN8nError(msg);addLog(`✗ ${msg}`,"error");
+      setN8nError(e.message||"Error desconocido");
+      addLog(`✗ ${e.message}`,"error");
     }
     setN8nLoading(false);
   };
@@ -505,12 +495,21 @@ function App() {
   const N8nView=()=>{
     const [localUrl,setLocalUrl]=useState(n8nUrl);
     const testCors=async()=>{
-      if(!localUrl) return;
-      addLog(`Probando CORS → ${localUrl}/webhook/gls-sheets`);
+      // 1. Verificar que el proxy PHP está activo
+      addLog("Comprobando proxy PHP...");
       try{
-        const r=await proxyFetch(`${localUrl}/webhook/gls-sheets`);
-        addLog(`✓ HTTP ${r.status} — Proxy OK`,"ok");
-      }catch(e){addLog(`✗ CORS bloqueado: ${e.message} — Aplica las variables en EasyPanel`,"error");}
+        const rp=await fetch("/n8n-proxy.php");
+        const pd=await rp.json();
+        if(pd.status==="ok") addLog(`✓ Proxy PHP activo — cURL: ${pd.curl}`,"ok");
+        else addLog(`⚠ Proxy respondió pero estado: ${JSON.stringify(pd)}`,"error");
+      }catch(e){addLog(`✗ Proxy PHP no encontrado (${e.message}) — ¿está n8n-proxy.php en el hosting?`,"error");return;}
+      // 2. Verificar conexión con n8n
+      if(!localUrl) return;
+      addLog(`Probando conexión n8n → ${localUrl}/webhook/gls-excel`);
+      try{
+        const r=await fetch(`/n8n-proxy.php?url=${encodeURIComponent(localUrl+"/webhook/gls-excel")}`);
+        addLog(`✓ n8n respondió HTTP ${r.status}`,"ok");
+      }catch(e){addLog(`✗ Error: ${e.message}`,"error");}
     };
     const testIncoming=()=>{
       const mock=Array.from({length:5},(_,i)=>({codexp:`GLS${100000+i}`,codservicio:["96","0","37","98","1"][i],nombdst:`EMPRESA TEST ${i+1}`,dirdst:`C/ MAYOR ${i+10}`,localidaddst:["TRUJILLO","MIAJADAS","MONTÁNCHEZ","LOGROSÁN","GARCIAZ"][i],cpdst:["10200","10100","10170","10180","10250"][i],eventoCodigo:[6,6,7,6,9][i],bultos:1,kilos:2.5,fpreviEntrega:new Date().toLocaleDateString("es-ES"),observ:"",conductor:""}));

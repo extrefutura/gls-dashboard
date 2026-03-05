@@ -3,7 +3,7 @@
  * GLS Dashboard — n8n Proxy
  * Bypasses browser CORS by proxying n8n webhook calls server-side.
  */
-set_time_limit(0);
+set_time_limit(0);                          // sin límite — n8n puede tardar 90+ s
 ignore_user_abort(true);
 
 header('Access-Control-Allow-Origin: *');
@@ -42,7 +42,7 @@ if (function_exists('curl_init')) {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT        => 120,
+        CURLOPT_TIMEOUT        => 120,          // 2 minutos
         CURLOPT_CONNECTTIMEOUT => 15,
         CURLOPT_HTTPHEADER     => ['Accept: application/json'],
         CURLOPT_SSL_VERIFYPEER => false,
@@ -66,10 +66,10 @@ if (function_exists('curl_init')) {
 // ── Fallback: file_get_contents ───────────────────────────────────────────────
 $ctx = stream_context_create([
     'http' => [
-        'method'        => 'GET',
-        'header'        => "Accept: application/json\r\n",
-        'timeout'       => 120,
-        'ignore_errors' => true,
+        'method'          => 'GET',
+        'header'          => "Accept: application/json\r\n",
+        'timeout'         => 120,
+        'ignore_errors'   => true,
     ],
     'ssl' => [
         'verify_peer'      => false,
