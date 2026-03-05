@@ -169,27 +169,17 @@ function App() {
       const hojas=sd.repartidores||[];
       addLog(`✓ ${hojas.length} hojas encontradas`,"ok");
       if(!hojas.length) throw new Error("No hay hojas asignadas en GLS Atlas hoy.");
-      const allEnvios=[];
-      for(const h of hojas){
-        try{
-          addLog(`Descargando: ${h.nombre}`);
-          const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"POST",mode:"cors",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetCode:h.sheetCode,placeCode:h.placeCode,nombre:h.nombre})});
-          if(!re.ok) throw new Error(`HTTP ${re.status}`);
-          const rd=await re.json();
-          allEnvios.push(...(rd.envios||[]));
-          addLog(`✓ ${h.nombre}: ${(rd.envios||[]).length} envíos`,"ok");
-        }catch(e){addLog(`✗ ${h.nombre}: ${e.message}`,"error");}
-      }
-      if(!allEnvios.length) throw new Error("No se encontraron expediciones.");
-      const processed=allEnvios.map(r=>{
-        const srvCode=String(r.codservicio||"");
-        const srvInfo=SERVICE_MAP[srvCode]||{label:srvCode||"STD",color:"#64748b",premium:false};
-        const nota=r.observ||"";
-        return{id:r.codexp,conductor:r.conductor||assignDriver(r.cpdst),cliente:r.nombdst||"DEST",direccion:r.dirdst||"SIN DIR.",localidad:r.localidaddst||"LOCALIDAD",cp:r.cpdst||"00000",estado:parseInt(r.eventoCodigo)||6,bultos:parseInt(r.bultos)||1,kgs:parseFloat(r.kilos)||0,fPrevista:r.fpreviEntrega||"--/--/--",srvCode,srvLabel:srvInfo.label,srvColor:srvInfo.color,isPremium:srvInfo.premium,nota,tieneNota:nota.length>2};
-      });
-      setData(prev=>{const m=new Map([...prev,...processed].map(x=>[x.id,x]));return[...m.values()];});
+      addLog(`Descargando Excel de ${hojas.length} hojas en una sola llamada...`);
+      const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+      if(!re.ok) throw new Error(`HTTP ${re.status} — ${re.statusText}`);
+      const rd=await re.json();
+      const allEnvios=rd.envios||[];
+      if(rd.errores&&rd.errores.length) rd.errores.forEach(err=>addLog(`⚠ ${err.dealer||err.sheetCode}: ${err.error||err.info}`,"error"));
+      addLog(`✓ ${rd.hojas||hojas.length} hojas descargadas — ${allEnvios.length} envíos`,"ok");
+      if(!allEnvios.length) throw new Error("No se encontraron expediciones. Comprueba la conexión con GLS Atlas.");
+      setData(prev=>{const m=new Map([...prev,...allEnvios].map(x=>[x.id,x]));return[...m.values()];});
       setN8nStatus("ok");setPage(1);
-      addLog(`✓ Total: ${processed.length} expediciones cargadas`,"ok");
+      addLog(`✓ Total: ${allEnvios.length} expediciones cargadas`,"ok");
     }catch(e){
       setN8nStatus("err");
       let msg=e.message||"Error desconocido";
