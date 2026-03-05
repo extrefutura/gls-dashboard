@@ -120,8 +120,12 @@ const processCSV = (text) => {
   return out;
 };
 
-// Todas las llamadas a n8n van por el proxy PHP (evita CORS)
-const proxyFetch = url => fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
+// Llamadas a n8n: intenta directo primero (si n8n tiene CORS ok), fallback a proxy PHP
+const proxyFetch = async url => {
+  try { return await fetch(url); } catch(e) {
+    return fetch(`/n8n-proxy.php?url=${encodeURIComponent(url)}`);
+  }
+};
 
 const isUrgent = fp => {
   if(!fp||fp==="--/--/--") return false;
@@ -147,6 +151,7 @@ function App() {
   const [n8nError,setN8nError]=useState("");
   const [n8nLog,setN8nLog]=useState([]);
   const [showN8nConfig,setShowN8nConfig]=useState(false);
+  const [sheetsPreview,setSheetsPreview]=useState(null);
   const [messages,setMessages]=useState([{role:"assistant",text:"Sistema listo. Carga datos desde n8n o CSV para comenzar."}]);
   const [chatInput,setChatInput]=useState("");
   const [isTyping,setIsTyping]=useState(false);
@@ -178,6 +183,22 @@ function App() {
       addLog(`✓ Total: ${allEnvios.length} expediciones cargadas`,"ok");
     }catch(e){
       setN8nStatus("err");
+      setN8nError(e.message||"Error desconocido");
+      addLog(`✗ ${e.message}`,"error");
+    }
+    setN8nLoading(false);
+  };
+
+  const pullSheetsPreview=async()=>{
+    if(!n8nUrl){setShowN8nConfig(true);return;}
+    setN8nLoading(true);setN8nError("");addLog("Consultando hojas disponibles en GLS Atlas...");
+    try{
+      const r=await proxyFetch(`${n8nUrl}/webhook/gls-sheets`);
+      if(!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
+      const rd=await r.json();
+      setSheetsPreview(rd.hojas||[]);
+      addLog(`✓ ${(rd.hojas||[]).length} repartidores con hojas hoy`,"ok");
+    }catch(e){
       setN8nError(e.message||"Error desconocido");
       addLog(`✗ ${e.message}`,"error");
     }
@@ -625,8 +646,11 @@ function App() {
               <button onClick={()=>{setData([]);setSelDriver("TODOS");setPage(1);setN8nStatus(null);setN8nError("");}} style={{padding:"0.625rem",background:"rgba(15,23,42,0.8)",border:"1px solid #1e293b",borderRadius:"0.875rem"}}>
                 <Ico d={ICONS.trash} size={17} color="#ef4444"/>
               </button>
+              <button onClick={pullSheetsPreview} disabled={n8nLoading} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.75rem 1.25rem",background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",color:"#818cf8",borderRadius:"1.5rem",fontSize:"0.7rem",fontWeight:900,textTransform:"uppercase",opacity:n8nLoading?0.6:1}}>
+                <Ico d={ICONS.search} size={15} color="#818cf8"/>Hojas
+              </button>
               <button onClick={pullAllSheets} disabled={n8nLoading} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.75rem 1.75rem",background:n8nUrl?"white":"rgba(255,255,255,0.1)",color:n8nUrl?"#0f0f15":"#475569",borderRadius:"1.5rem",fontSize:"0.7rem",fontWeight:900,textTransform:"uppercase",opacity:n8nLoading?0.6:1}}>
-                {n8nLoading?<><Ico d={ICONS.clock} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargando…</>:<><Ico d={ICONS.zap} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargar desde n8n</>}
+                {n8nLoading?<><Ico d={ICONS.clock} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargando…</>:<><Ico d={ICONS.zap} size={16} color={n8nUrl?"#0f0f15":"#475569"}/>Cargar Excel</>}
               </button>
             </div>
           </div>
@@ -640,6 +664,30 @@ function App() {
                 <button onClick={()=>setView("n8n")} style={{marginTop:"0.5rem",padding:"0.375rem 0.875rem",background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",borderRadius:"0.5rem",fontSize:"0.6rem",fontWeight:900,color:"#818cf8"}}>Ver configuración n8n →</button>
               </div>
               <button onClick={()=>setN8nError("")} style={{color:"#64748b",flexShrink:0}}><Ico d={ICONS.x} size={15}/></button>
+            </div>
+          )}
+
+          {sheetsPreview&&sheetsPreview.length>0&&!data.length&&(
+            <div style={{background:"rgba(15,23,42,0.6)",border:"1px solid rgba(99,102,241,0.25)",borderRadius:"1.5rem",padding:"1.25rem 1.5rem",marginBottom:"1.5rem"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.875rem"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                  <Ico d={ICONS.package} size={16} color="#818cf8"/>
+                  <span style={{fontSize:"0.7rem",fontWeight:900,color:"#818cf8",textTransform:"uppercase",letterSpacing:"0.05em"}}>Hojas de hoy</span>
+                </div>
+                <button onClick={()=>setSheetsPreview(null)} style={{color:"#475569",fontSize:"0.65rem"}}>✕</button>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"1rem"}}>
+                {sheetsPreview.map((h,i)=>(
+                  <div key={i} style={{background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:"1rem",padding:"0.4rem 0.875rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                    <span style={{fontSize:"0.65rem",fontWeight:800,color:"#e2e8f0"}}>{h.dealer}</span>
+                    <span style={{fontSize:"0.6rem",background:"rgba(99,102,241,0.3)",borderRadius:"0.4rem",padding:"0.1rem 0.4rem",color:"#a5b4fc",fontWeight:900}}>{h.hojas} {h.hojas===1?"hoja":"hojas"}</span>
+                    {h.bultos>0&&<span style={{fontSize:"0.6rem",color:"#64748b"}}>{h.bultos} bultos</span>}
+                  </div>
+                ))}
+              </div>
+              <button onClick={pullAllSheets} disabled={n8nLoading} style={{display:"flex",alignItems:"center",gap:"0.5rem",padding:"0.625rem 1.5rem",background:"white",color:"#0f0f15",borderRadius:"1.25rem",fontSize:"0.7rem",fontWeight:900,textTransform:"uppercase"}}>
+                <Ico d={ICONS.zap} size={14} color="#0f0f15"/>Descargar Excel completo
+              </button>
             </div>
           )}
 

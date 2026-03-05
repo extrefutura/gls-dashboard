@@ -4,6 +4,42 @@
     {
       "parameters": {
         "httpMethod": "GET",
+        "path": "gls-sheets",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "aa11bb22-cc33-dd44-ee55-ff6677889900",
+      "name": "Webhook gls-sheets",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, -160],
+      "webhookId": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// GLS Atlas — login único + GetSummarySheets (resumen sin descargar Excel)\nconst axios = require('axios');\nconst BASE     = 'https://atlas.gls-spain.es';\nconst GLS_USER = $env.GLS_USER || '';\nconst GLS_PASS = $env.GLS_PASS || '';\n\nconst jar = {};\nfunction saveCookies(headers) {\n  const raw = headers['set-cookie'] || [];\n  for (const c of (Array.isArray(raw) ? raw : [raw])) {\n    if (!c) continue;\n    const pair = c.split(';')[0].trim();\n    const eq   = pair.indexOf('=');\n    if (eq > 0) jar[pair.substring(0, eq).trim()] = pair;\n  }\n}\nfunction cookieHeader() { return Object.values(jar).join('; '); }\n\nasync function req(method, url, opts, depth) {\n  depth = depth || 0;\n  if (depth > 12) throw new Error('Demasiadas redirecciones');\n  const extra   = opts || {};\n  const headers = Object.assign({ 'User-Agent': 'Mozilla/5.0' }, extra.h || {});\n  const ck = cookieHeader();\n  if (ck) headers['Cookie'] = ck;\n  const res = await axios.request({\n    method, url, headers, data: extra.body || null,\n    maxRedirects: 0, validateStatus: () => true, responseType: 'text'\n  });\n  saveCookies(res.headers);\n  if ([301,302,303,307,308].includes(res.status)) {\n    const loc  = res.headers.location || '';\n    const next = loc.startsWith('http') ? loc : BASE + loc;\n    return req([301,302,303].includes(res.status) ? 'GET' : method, next, extra, depth + 1);\n  }\n  return { status: res.status, body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };\n}\nfunction csrf(html) {\n  const m = html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);\n  if (!m) throw new Error('Token CSRF no encontrado');\n  return m[1];\n}\n\nconst hoy  = new Date();\nconst fmt  = d => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();\nconst desde = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1));\nconst hasta  = fmt(hoy);\n\n// Login\nconst r1 = await req('GET', BASE + '/Account/Login');\nconst c1 = csrf(r1.body);\nconst r2 = await req('POST', BASE + '/Account/Login', {\n  h: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': BASE + '/Account/Login' },\n  body: 'Username=' + encodeURIComponent(GLS_USER) + '&Password=' + encodeURIComponent(GLS_PASS) + '&__RequestVerificationToken=' + encodeURIComponent(c1)\n});\nif (r2.body.toLowerCase().includes('name=\"password\"')) throw new Error('Login fallido — revisa GLS_USER y GLS_PASS');\n\n// CSRF para POSTs\nconst r3 = await req('GET', BASE + '/delivery/index');\nif (r3.body.toLowerCase().includes('<title>sign in')) throw new Error('Sesión inválida tras login');\nconst c2 = csrf(r3.body);\n\nconst postH = {\n  'Content-Type': 'application/x-www-form-urlencoded',\n  'X-Requested-With': 'XMLHttpRequest',\n  'Accept': 'application/json, text/javascript, */*; q=0.01',\n  'Referer': BASE + '/delivery/index'\n};\nconst tokenParam = '__RequestVerificationToken=' + encodeURIComponent(c2);\nconst dateParams = '&filters%5Bsince%5D=' + encodeURIComponent(desde) + '&filters%5Buntil%5D=' + encodeURIComponent(hasta);\n\n// GetSummarySheets\nconst rS = await req('POST', BASE + '/delivery/GetSummarySheets', { h: postH, body: tokenParam + dateParams });\nlet raw = rS.body;\ntry { raw = JSON.parse(raw); } catch(e) {}\nconst lista = ((raw && raw.Data && raw.Data.List) || []).filter(s => s.SheetCode != null && s.DealerCode && s.DealerCode < 9000);\n\n// Agrupar por repartidor\nconst por = {};\nfor (const h of lista) {\n  const d = h.Dealer || h.dealer || 'DESCONOCIDO';\n  if (!por[d]) por[d] = { dealer: d, hojas: 0, bultos: 0 };\n  por[d].hojas++;\n  por[d].bultos += parseInt(h.TotalPackages || h.totalPackages || 0) || 0;\n}\n\nreturn [{ json: {\n  hojas: Object.values(por),\n  total: lista.length,\n  fecha: fmt(hoy)\n} }];"
+      },
+      "id": "bb22cc33-dd44-ee55-ff66-778899001122",
+      "name": "GLS Atlas — Resumen hojas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [380, -160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "cc33dd44-ee55-ff66-7788-990011223344",
+      "name": "Respond gls-sheets",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [660, -160]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
         "path": "gls-excel",
         "responseMode": "responseNode",
         "options": {}
@@ -74,6 +110,12 @@
     }
   ],
   "connections": {
+    "Webhook gls-sheets": {
+      "main": [[{ "node": "GLS Atlas — Resumen hojas", "type": "main", "index": 0 }]]
+    },
+    "GLS Atlas — Resumen hojas": {
+      "main": [[{ "node": "Respond gls-sheets", "type": "main", "index": 0 }]]
+    },
     "Webhook gls-excel": {
       "main": [[{ "node": "GLS Atlas — Login + Hojas + Excel", "type": "main", "index": 0 }]]
     },
