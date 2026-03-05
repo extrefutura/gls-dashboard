@@ -495,12 +495,21 @@ function App() {
   const N8nView=()=>{
     const [localUrl,setLocalUrl]=useState(n8nUrl);
     const testCors=async()=>{
-      if(!localUrl) return;
-      addLog(`Probando proxy → ${localUrl}/webhook/gls-sheets`);
+      // 1. Verificar que el proxy PHP está activo
+      addLog("Comprobando proxy PHP...");
       try{
-        const r=await proxyFetch(`${localUrl}/webhook/gls-sheets`);
-        addLog(`✓ HTTP ${r.status} — Proxy OK`,"ok");
-      }catch(e){addLog(`✗ Error proxy: ${e.message}`,"error");}
+        const rp=await fetch("/n8n-proxy.php");
+        const pd=await rp.json();
+        if(pd.status==="ok") addLog(`✓ Proxy PHP activo — cURL: ${pd.curl}`,"ok");
+        else addLog(`⚠ Proxy respondió pero estado: ${JSON.stringify(pd)}`,"error");
+      }catch(e){addLog(`✗ Proxy PHP no encontrado (${e.message}) — ¿está n8n-proxy.php en el hosting?`,"error");return;}
+      // 2. Verificar conexión con n8n
+      if(!localUrl) return;
+      addLog(`Probando conexión n8n → ${localUrl}/webhook/gls-excel`);
+      try{
+        const r=await fetch(`/n8n-proxy.php?url=${encodeURIComponent(localUrl+"/webhook/gls-excel")}`);
+        addLog(`✓ n8n respondió HTTP ${r.status}`,"ok");
+      }catch(e){addLog(`✗ Error: ${e.message}`,"error");}
     };
     const testIncoming=()=>{
       const mock=Array.from({length:5},(_,i)=>({codexp:`GLS${100000+i}`,codservicio:["96","0","37","98","1"][i],nombdst:`EMPRESA TEST ${i+1}`,dirdst:`C/ MAYOR ${i+10}`,localidaddst:["TRUJILLO","MIAJADAS","MONTÁNCHEZ","LOGROSÁN","GARCIAZ"][i],cpdst:["10200","10100","10170","10180","10250"][i],eventoCodigo:[6,6,7,6,9][i],bultos:1,kilos:2.5,fpreviEntrega:new Date().toLocaleDateString("es-ES"),observ:"",conductor:""}));
