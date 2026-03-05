@@ -6,7 +6,9 @@
         "httpMethod": "GET",
         "path": "gls-excel",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "allowedOrigins": "*"
+        }
       },
       "id": "dd44ee55-ff66-7788-9900-112233445566",
       "name": "Webhook gls-excel",
@@ -42,7 +44,9 @@
         "httpMethod": "GET",
         "path": "gls-estados",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "allowedOrigins": "*"
+        }
       },
       "id": "00112233-4455-6677-8899-aabbccddeeff",
       "name": "Webhook gls-estados",
