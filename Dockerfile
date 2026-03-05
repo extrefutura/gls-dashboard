@@ -1,4 +1,3 @@
-FROM php:8.2-apache
-COPY index.html /var/www/html/index.html
-COPY n8n-proxy.php /var/www/html/n8n-proxy.php
+FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/index.html
 EXPOSE 80
