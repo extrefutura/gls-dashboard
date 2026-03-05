@@ -166,6 +166,7 @@ function App() {
       const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
       if(!re.ok) throw new Error(`HTTP ${re.status} — ${re.statusText}`);
       const rd=await re.json();
+      if(rd.ok===false) throw new Error(rd.error||"Error en n8n");
       const allEnvios=rd.envios||[];
       if(rd.errores&&rd.errores.length) rd.errores.forEach(err=>addLog(`⚠ ${err.dealer||err.sheetCode}: ${err.error||err.info}`,"error"));
       addLog(`✓ ${rd.hojas||0} hojas — ${allEnvios.length} envíos`,"ok");
@@ -176,9 +177,10 @@ function App() {
     }catch(e){
       setN8nStatus("err");
       let msg=e.message||"Error desconocido";
-      if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")){
-        msg="CORS bloqueado — Aplica las variables de entorno en EasyPanel y reinicia n8n.";
+      if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")||msg.toLowerCase().includes("cors")){
+        msg="No se puede conectar con n8n — verifica la URL y que las variables CORS estén aplicadas en EasyPanel.";
         addLog("→ Variables necesarias: WEBHOOK_CORS_ALLOWED_ORIGINS=*","error");
+        addLog("→ Reinicia n8n en EasyPanel tras añadirlas","error");
       }
       setN8nError(msg);addLog(`✗ ${msg}`,"error");
     }
@@ -497,9 +499,9 @@ function App() {
     const [localUrl,setLocalUrl]=useState(n8nUrl);
     const testCors=async()=>{
       if(!localUrl) return;
-      addLog(`Probando CORS → ${localUrl}/webhook/gls-excel`);
+      addLog(`Probando CORS → ${localUrl}/webhook/gls-ping`);
       try{
-        const r=await fetch(`${localUrl}/webhook/gls-excel`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+        const r=await fetch(`${localUrl}/webhook/gls-ping`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
         addLog(`✓ HTTP ${r.status} — CORS OK`,"ok");
       }catch(e){addLog(`✗ CORS bloqueado: ${e.message} — Aplica las variables en EasyPanel`,"error");}
     };
