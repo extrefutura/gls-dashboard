@@ -4,28 +4,47 @@
     {
       "parameters": {
         "httpMethod": "GET",
-        "path": "gls-ping",
+        "path": "gls-sheets",
         "responseMode": "responseNode",
         "options": {}
       },
       "id": "aa11bb22-cc33-dd44-ee55-ff6677889900",
-      "name": "Webhook gls-ping",
+      "name": "Webhook gls-sheets",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [100, 60],
+      "position": [
+        100,
+        100
+      ],
       "webhookId": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e5"
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"ok\":true,\"ts\":\"{{$now}}\"}",
-        "options": {}
+        "jsCode": "const axios=require('axios');\nconst BASE='https://atlas.gls-spain.es';\nconst GLS_USER=$env.GLS_USER||'';\nconst GLS_PASS=$env.GLS_PASS||'';\nconst jar={};\nfunction sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}\nfunction ch(){return Object.values(jar).join('; ');}\nasync function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h},_rd+1);}return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}\nfunction csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\n\nconst r1=await req('GET',BASE+'/Account/Login');\nconst c1=csrf(r1.body);\n\nconst r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});\nif(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas. Revisa GLS_USER y GLS_PASS.');\n\nconst r3=await req('GET',BASE+'/delivery/index');\nif(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('delivery/index devuelve login — sesión no autenticada');\nconst c2=csrf(r3.body);\n\nconst hoy=new Date();\nconst fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();\n\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)))+'&filters%5Buntil%5D='+encodeURIComponent(fmt(hoy))});\nlet raw=r4.body;\ntry{raw=JSON.parse(raw);}catch(e){}\n\nconst arr=(raw&&raw.Data&&raw.Data.List)||(raw&&raw.data)||(raw&&raw.sheets)||(raw&&raw.hojas)||(raw&&raw.repartidores)||(Array.isArray(raw)?raw:[]);\nconst repartidores=arr.filter(s=>s.SheetCode!=null&&s.DealerCode&&s.DealerCode<9000).map(s=>({nombre:s.Dealer||s.nombre||s.name||s.Name||s.driverName||s.Conductor||'Sin nombre',sheetCode:String(s.SheetCode||s.sheetCode||s.id||s.Id||''),placeCode:String(s.PlaceCode||s.placeCode||s.cp||s.postalCode||'')}));\n\nreturn [{json:{repartidores:repartidores,_status:r4.status,_raw:raw,_debug:{r1:r1.status,r2:r2.status,r3:r3.status}}}];"
       },
       "id": "bb22cc33-dd44-ee55-ff66-778899001122",
-      "name": "Respond gls-ping",
+      "name": "Auth + GetSummarySheets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "cc33dd44-ee55-ff66-7788-990011223344",
+      "name": "Respond gls-sheets",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [380, 60]
+      "position": [
+        660,
+        100
+      ]
     },
     {
       "parameters": {
@@ -38,18 +57,24 @@
       "name": "Webhook gls-excel",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [100, 300],
+      "position": [
+        100,
+        360
+      ],
       "webhookId": "b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f6"
     },
     {
       "parameters": {
-        "jsCode": "try{const axios=require('axios');let XLSX;try{XLSX=require('xlsx');}catch(e){XLSX=null;}const BASE='https://atlas.gls-spain.es';const GLS_USER=$env.GLS_USER||'';const GLS_PASS=$env.GLS_PASS||'';if(!GLS_USER||!GLS_PASS)return[{json:{ok:false,error:'Variables GLS_USER o GLS_PASS no configuradas en n8n',envios:[],repartidores:[]}}];const jar={};function sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}function ch(){return Object.values(jar).join('; ');}async function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const binary=!!(opts||{}).binary;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method,url,headers:hdrs,data:body,maxRedirects:0,validateStatus:()=>true,responseType:binary?'arraybuffer':'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;return req([301,302,303].indexOf(res.status)>=0?'GET':method,loc&&loc.startsWith('http')?loc:BASE+loc,{h:h,binary:binary},_rd+1);}if(binary)return{status:res.status,ct:res.headers['content-type']||'',data:Buffer.from(res.data)};return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}function csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado — GLS Atlas puede estar caído o ha cambiado su login');return m[1];}const hoy=new Date();const fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();const fDesde=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1));const fHasta=fmt(hoy);const r1=await req('GET',BASE+'/Account/Login');const c1=csrf(r1.body);const r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});if(r2.body.toLowerCase().includes('name=\"password\"'))return[{json:{ok:false,error:'Login fallido — revisa GLS_USER/GLS_PASS',envios:[],repartidores:[]}}];const r3=await req('GET',BASE+'/delivery/index');if(r3.body.toLowerCase().includes('<title>sign in'))return[{json:{ok:false,error:'Sesión no válida tras login',envios:[],repartidores:[]}}];const c2=csrf(r3.body);const r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let sheetsRaw=r4.body;try{sheetsRaw=JSON.parse(sheetsRaw);}catch(e){}const hojas=((sheetsRaw&&sheetsRaw.Data&&sheetsRaw.Data.List)||[]).filter(s=>s.SheetCode!=null&&s.DealerCode&&s.DealerCode<9000);const repartidores=hojas.map(s=>({nombre:s.Dealer||'Sin nombre',sheetCode:String(s.SheetCode||''),placeCode:String(s.PlaceCode||'')}));const SERVICE_MAP={'10':{label:'10 HORAS',color:'#ef4444',premium:true},'96':{label:'24 HORAS',color:'#10b981',premium:false},'97':{label:'ECONOMY',color:'#6366f1',premium:false},'22':{label:'PARCEL',color:'#f59e0b',premium:false}};const enviosTodos=[];const errores=[];for(const hoja of hojas){try{const rXls=await req('POST',BASE+'/delivery/ExportDeliverySheet',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta),binary:true});const ct=(rXls.ct||'').toLowerCase();const isXls=ct.includes('spreadsheet')||ct.includes('excel')||ct.includes('openxmlformats')||ct.includes('octet-stream');if(rXls.status===200&&isXls&&XLSX&&rXls.data&&rXls.data.length>100){const wb=XLSX.read(rXls.data,{type:'buffer'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});for(const row of rows){const k={};for(const key of Object.keys(row)){const norm=key.toLowerCase().replace(/\\s+/g,'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');k[norm]=row[key];}const codexp=String(k['codexp']||k['codigoenvio']||k['nenvio']||k['expedicion']||'').trim();if(!codexp)continue;const srvCode=String(k['servicio']||k['codservicio']||k['tiposervicio']||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:codexp,conductor:hoja.Dealer,cliente:String(k['destinatario']||k['cliente']||''),direccion:String(k['direccion']||k['domicilio']||''),localidad:String(k['localidad']||k['poblacion']||''),cp:String(k['cp']||k['codigopostal']||String(hoja.PlaceCode)||''),estado:parseInt(k['estado']||k['eventococigo']||6)||6,bultos:parseInt(k['bultos']||1)||1,kgs:parseFloat(k['kgs']||k['peso']||0)||0,fPrevista:String(k['fprevista']||k['fechaprevista']||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(k['nota']||k['observaciones']||''),tieneNota:!!(k['nota']||k['observaciones'])});}}else{const rJ=await req('POST',BASE+'/delivery/GetDeliveryItems',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let jRaw=rJ.body;try{jRaw=JSON.parse(jRaw);}catch(e){}const items=(jRaw&&jRaw.Data&&jRaw.Data.List)||(Array.isArray(jRaw)?jRaw:[]);for(const i of items){const srvCode=String(i.srvCode||i.ServCode||i.CodServicio||i.ServiceCode||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:String(i.codexp||i.CodExp||i.Codexp||i.Id||''),conductor:hoja.Dealer,cliente:String(i.destinatario||i.Destinatario||''),direccion:String(i.direccion||i.Direccion||''),localidad:String(i.localidad||i.Localidad||''),cp:String(i.cp||i.CP||String(hoja.PlaceCode)||''),estado:parseInt(i.eventoCodigo||i.EventoCodigo||i.Status||6)||6,bultos:parseInt(i.bultos||i.Bultos||1)||1,kgs:parseFloat(i.kgs||i.Kgs||0)||0,fPrevista:String(i.fPrevista||i.FPrevista||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(i.nota||i.Nota||''),tieneNota:!!(i.nota||i.Nota)});}if(rXls.status!==200)errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,info:'Excel HTTP '+rXls.status+', JSON fallback, items: '+items.length});}}catch(e){errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,error:e.message});}}return [{json:{ok:true,repartidores,envios:enviosTodos,hojas:hojas.length,errores,_debug:{totalHojas:hojas.length,totalEnvios:enviosTodos.length,xlsxAvailable:!!XLSX}}}];}catch(e){return[{json:{ok:false,error:e.message,stack:e.stack?e.stack.split('\\n').slice(0,5).join(' | '):'',envios:[],repartidores:[]}}];}"
+        "jsCode": "const axios=require('axios');let XLSX;try{XLSX=require('xlsx');}catch(e){XLSX=null;}const BASE='https://atlas.gls-spain.es';const GLS_USER=$env.GLS_USER||'';const GLS_PASS=$env.GLS_PASS||'';const jar={};function sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}function ch(){return Object.values(jar).join('; ');}async function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const binary=!!(opts||{}).binary;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:binary?'arraybuffer':'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h,binary:binary},_rd+1);}if(binary)return{status:res.status,ct:res.headers['content-type']||'',data:Buffer.from(res.data)};return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}function csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\nconst hoy=new Date();const fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();const fDesde=fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1));const fHasta=fmt(hoy);\n// 1. Autenticar\nconst r1=await req('GET',BASE+'/Account/Login');const c1=csrf(r1.body);const r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});if(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas');\n// 2. delivery/index para CSRF\nconst r3=await req('GET',BASE+'/delivery/index');if(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('Sesión no válida tras login');const c2=csrf(r3.body);\n// 3. Obtener todas las hojas\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let sheetsRaw=r4.body;try{sheetsRaw=JSON.parse(sheetsRaw);}catch(e){}const hojas=((sheetsRaw&&sheetsRaw.Data&&sheetsRaw.Data.List)||[]).filter(s=>s.SheetCode!=null&&s.DealerCode&&s.DealerCode<9000);\nconst SERVICE_MAP={'10':{label:'10 HORAS',color:'#ef4444',premium:true},'96':{label:'24 HORAS',color:'#10b981',premium:false},'97':{label:'ECONOMY',color:'#6366f1',premium:false},'22':{label:'PARCEL',color:'#f59e0b',premium:false}};const enviosTodos=[];const errores=[];\n// 4. Por cada hoja: intentar Excel, fallback a GetDeliveryItems JSON\nfor(const hoja of hojas){try{// Intentar descarga Excel\nconst rXls=await req('POST',BASE+'/delivery/ExportDeliverySheet',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta),binary:true});const ct=(rXls.ct||'').toLowerCase();const isXls=ct.includes('spreadsheet')||ct.includes('excel')||ct.includes('openxmlformats')||ct.includes('octet-stream');if(rXls.status===200&&isXls&&XLSX&&rXls.data&&rXls.data.length>100){// Parsear Excel\nconst wb=XLSX.read(rXls.data,{type:'buffer'});const ws=wb.Sheets[wb.SheetNames[0]];const rows=XLSX.utils.sheet_to_json(ws,{defval:''});for(const row of rows){const k={};for(const key of Object.keys(row)){const norm=key.toLowerCase().replace(/\\s+/g,'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');k[norm]=row[key];}const codexp=String(k['codexp']||k['codigoenvio']||k['nenvio']||k['expedicion']||'').trim();if(!codexp)continue;const srvCode=String(k['servicio']||k['codservicio']||k['tiposervicio']||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:codexp,conductor:hoja.Dealer,cliente:String(k['destinatario']||k['cliente']||''),direccion:String(k['direccion']||k['domicilio']||''),localidad:String(k['localidad']||k['poblacion']||''),cp:String(k['cp']||k['codigopostal']||String(hoja.PlaceCode)||''),estado:parseInt(k['estado']||k['eventococigo']||6)||6,bultos:parseInt(k['bultos']||1)||1,kgs:parseFloat(k['kgs']||k['peso']||0)||0,fPrevista:String(k['fprevista']||k['fechaprevista']||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(k['nota']||k['observaciones']||''),tieneNota:!!(k['nota']||k['observaciones'])});}}else{// Fallback: GetDeliveryItems JSON\nconst rJ=await req('POST',BASE+'/delivery/GetDeliveryItems',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&sheetCode='+encodeURIComponent(String(hoja.SheetCode))+'&placeCode='+encodeURIComponent(String(hoja.PlaceCode))+'&filters%5Bsince%5D='+encodeURIComponent(fDesde)+'&filters%5Buntil%5D='+encodeURIComponent(fHasta)});let jRaw=rJ.body;try{jRaw=JSON.parse(jRaw);}catch(e){}const items=(jRaw&&jRaw.Data&&jRaw.Data.List)||(Array.isArray(jRaw)?jRaw:[]);for(const i of items){const srvCode=String(i.srvCode||i.ServCode||i.CodServicio||i.ServiceCode||'96');const srv=SERVICE_MAP[srvCode]||{label:'24 HORAS',color:'#10b981',premium:false};enviosTodos.push({id:String(i.codexp||i.CodExp||i.Codexp||i.Id||''),conductor:hoja.Dealer,cliente:String(i.destinatario||i.Destinatario||''),direccion:String(i.direccion||i.Direccion||''),localidad:String(i.localidad||i.Localidad||''),cp:String(i.cp||i.CP||String(hoja.PlaceCode)||''),estado:parseInt(i.eventoCodigo||i.EventoCodigo||i.Status||6)||6,bultos:parseInt(i.bultos||i.Bultos||1)||1,kgs:parseFloat(i.kgs||i.Kgs||0)||0,fPrevista:String(i.fPrevista||i.FPrevista||fmt(hoy)),srvCode:srvCode,srvLabel:srv.label,srvColor:srv.color,isPremium:srv.premium,nota:String(i.nota||i.Nota||''),tieneNota:!!(i.nota||i.Nota)});}if(rXls.status!==200)errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,info:'Excel HTTP '+rXls.status+', usado JSON API, items: '+items.length});}}catch(e){errores.push({sheetCode:hoja.SheetCode,dealer:hoja.Dealer,error:e.message});}}\nreturn [{json:{envios:enviosTodos,hojas:hojas.length,errores:errores,_debug:{sheetsStatus:r4.status,totalHojas:hojas.length,totalEnvios:enviosTodos.length,xlsxAvailable:!!XLSX}}}];"
       },
       "id": "ee55ff66-7788-9900-1122-334455667788",
-      "name": "Auth + Hojas + Envíos",
+      "name": "Auth + GetDeliveryItems",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [380, 300]
+      "position": [
+        380,
+        360
+      ]
     },
     {
       "parameters": {
@@ -61,18 +86,122 @@
       "name": "Respond gls-excel",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [660, 300]
+      "position": [
+        660,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "gls-estados",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "00112233-4455-6677-8899-aabbccddeeff",
+      "name": "Webhook gls-estados",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        100,
+        620
+      ],
+      "webhookId": "c3c3c3c3-d4d4-e5e5-f6f6-a7a7a7a7a7a7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const axios=require('axios');\nconst BASE='https://atlas.gls-spain.es';\nconst GLS_USER=$env.GLS_USER||'';\nconst GLS_PASS=$env.GLS_PASS||'';\nconst jar={};\nfunction sc(h){const v=h['set-cookie']||[];for(const c of(Array.isArray(v)?v:[v])){if(!c)continue;const p=c.split(';')[0].trim();const e=p.indexOf('=');if(e>0)jar[p.substring(0,e).trim()]=p;}}\nfunction ch(){return Object.values(jar).join('; ');}\nasync function req(method,url,opts,_rd){_rd=_rd||0;if(_rd>10)throw new Error('Demasiadas redirecciones');const h=(opts||{}).h||{};const body=(opts||{}).body||null;const hdrs=Object.assign({'User-Agent':'Mozilla/5.0'},h);const ck=ch();if(ck)hdrs['Cookie']=ck;const res=await axios.request({method:method,url:url,headers:hdrs,data:body,maxRedirects:0,validateStatus:function(){return true;},responseType:'text'});sc(res.headers);if([301,302,303,307,308].indexOf(res.status)>=0){const loc=res.headers.location;const next=loc&&loc.startsWith('http')?loc:BASE+loc;return req([301,302,303].indexOf(res.status)>=0?'GET':method,next,{h:h},_rd+1);}return{status:res.status,body:typeof res.data==='string'?res.data:JSON.stringify(res.data)};}\nfunction csrf(html){const m=html.match(/name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"/);if(!m)throw new Error('CSRF no encontrado');return m[1];}\n\nconst r1=await req('GET',BASE+'/Account/Login');\nconst c1=csrf(r1.body);\n\nconst r2=await req('POST',BASE+'/Account/Login',{h:{'Content-Type':'application/x-www-form-urlencoded','Referer':BASE+'/Account/Login'},body:'Username='+encodeURIComponent(GLS_USER)+'&Password='+encodeURIComponent(GLS_PASS)+'&__RequestVerificationToken='+encodeURIComponent(c1)});\nif(r2.body.toLowerCase().includes('name=\"password\"'))throw new Error('Login fallido — credenciales incorrectas. Revisa GLS_USER y GLS_PASS.');\n\nconst r3=await req('GET',BASE+'/delivery/index');\nif(r3.body.toLowerCase().includes('<title>sign in'))throw new Error('Sesión no válida');\nconst c2=csrf(r3.body);\n\nconst hoy=new Date();\nconst fmt=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();\n\nconst r4=await req('POST',BASE+'/delivery/GetSummarySheets',{h:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*; q=0.01','Referer':BASE+'/delivery/index'},body:'__RequestVerificationToken='+encodeURIComponent(c2)+'&filters%5Bsince%5D='+encodeURIComponent(fmt(hoy))+'&filters%5Buntil%5D='+encodeURIComponent(fmt(hoy))});\nlet raw=r4.body;\ntry{raw=JSON.parse(raw);}catch(e){}\nconst items=(raw&&raw.Data&&raw.Data.List)||(raw&&raw.data)||(raw&&raw.items)||(Array.isArray(raw)?raw:[]);\nconst updates=items.map(function(i){return{codexp:String(i.codexp||i.CodExp||i.id||i.Id||''),eventoCodigo:String(i.eventoCodigo||i.EventoCodigo||i.estado||i.Status||6)};}).filter(function(i){return i.codexp;});\n\nreturn updates.length?updates.map(function(u){return{json:u};}):[{json:{codexp:'',eventoCodigo:'0'}}];"
+      },
+      "id": "11223344-5566-7788-99aa-bbccddeeff00",
+      "name": "Auth + GetEstados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "22334455-6677-8899-aabb-ccddeeff0011",
+      "name": "Respond gls-estados",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        660,
+        620
+      ]
     }
   ],
   "connections": {
-    "Webhook gls-ping": {
-      "main": [[{"node": "Respond gls-ping", "type": "main", "index": 0}]]
+    "Webhook gls-sheets": {
+      "main": [
+        [
+          {
+            "node": "Auth + GetSummarySheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth + GetSummarySheets": {
+      "main": [
+        [
+          {
+            "node": "Respond gls-sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Webhook gls-excel": {
-      "main": [[{"node": "Auth + Hojas + Envíos", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Auth + GetDeliveryItems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Auth + Hojas + Envíos": {
-      "main": [[{"node": "Respond gls-excel", "type": "main", "index": 0}]]
+    "Auth + GetDeliveryItems": {
+      "main": [
+        [
+          {
+            "node": "Respond gls-excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook gls-estados": {
+      "main": [
+        [
+          {
+            "node": "Auth + GetEstados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth + GetEstados": {
+      "main": [
+        [
+          {
+            "node": "Respond gls-estados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,

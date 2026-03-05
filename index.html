@@ -162,21 +162,31 @@ function App() {
     if(!n8nUrl){setShowN8nConfig(true);return;}
     setN8nLoading(true);setN8nError("");addLog("Iniciando carga desde n8n...");
     try{
-      addLog(`GET ${n8nUrl}/webhook/gls-excel (vía proxy)`);
-      const re=await fetch(`./n8n-proxy.php?base=${encodeURIComponent(n8nUrl)}&ep=gls-excel`,{method:"GET",headers:{Accept:"application/json"}});
+      addLog(`GET ${n8nUrl}/webhook/gls-sheets`);
+      const r=await fetch(`${n8nUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+      if(!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`);
+      const sd=await r.json();
+      const hojas=sd.repartidores||[];
+      addLog(`✓ ${hojas.length} hojas encontradas`,"ok");
+      if(!hojas.length) throw new Error("No hay hojas asignadas en GLS Atlas hoy.");
+      addLog(`Descargando Excel de ${hojas.length} hojas en una sola llamada...`);
+      const re=await fetch(`${n8nUrl}/webhook/gls-excel`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
       if(!re.ok) throw new Error(`HTTP ${re.status} — ${re.statusText}`);
       const rd=await re.json();
-      if(rd.ok===false) throw new Error(rd.error||"Error en n8n");
       const allEnvios=rd.envios||[];
       if(rd.errores&&rd.errores.length) rd.errores.forEach(err=>addLog(`⚠ ${err.dealer||err.sheetCode}: ${err.error||err.info}`,"error"));
-      addLog(`✓ ${rd.hojas||0} hojas — ${allEnvios.length} envíos`,"ok");
+      addLog(`✓ ${rd.hojas||hojas.length} hojas descargadas — ${allEnvios.length} envíos`,"ok");
       if(!allEnvios.length) throw new Error("No se encontraron expediciones. Comprueba la conexión con GLS Atlas.");
       setData(prev=>{const m=new Map([...prev,...allEnvios].map(x=>[x.id,x]));return[...m.values()];});
       setN8nStatus("ok");setPage(1);
       addLog(`✓ Total: ${allEnvios.length} expediciones cargadas`,"ok");
     }catch(e){
       setN8nStatus("err");
-      const msg=e.message||"Error desconocido";
+      let msg=e.message||"Error desconocido";
+      if(msg.toLowerCase().includes("failed to fetch")||msg.toLowerCase().includes("networkerror")){
+        msg="CORS bloqueado — Aplica las variables de entorno en EasyPanel y reinicia n8n.";
+        addLog("→ Variables necesarias: WEBHOOK_CORS_ALLOWED_ORIGINS=*","error");
+      }
       setN8nError(msg);addLog(`✗ ${msg}`,"error");
     }
     setN8nLoading(false);
@@ -185,7 +195,7 @@ function App() {
   const pullEstados=async()=>{
     if(!n8nUrl||!data.length) return;
     try{
-      const r=await fetch(`./n8n-proxy.php?base=${encodeURIComponent(n8nUrl)}&ep=gls-estados`);
+      const r=await fetch(`${n8nUrl}/webhook/gls-estados`,{mode:"cors"});
       if(!r.ok) return;
       const updates=await r.json();
       if(!Array.isArray(updates)||!updates.length) return;
@@ -494,13 +504,11 @@ function App() {
     const [localUrl,setLocalUrl]=useState(n8nUrl);
     const testCors=async()=>{
       if(!localUrl) return;
-      addLog(`Probando conexión → ${localUrl}/webhook/gls-ping`);
+      addLog(`Probando CORS → ${localUrl}/webhook/gls-sheets`);
       try{
-        const r=await fetch(`./n8n-proxy.php?base=${encodeURIComponent(localUrl)}&ep=gls-ping`,{method:"GET",headers:{Accept:"application/json"}});
-        const d=await r.json().catch(()=>({}));
-        if(r.ok&&d.ok!==false) addLog(`✓ HTTP ${r.status} — Conexión OK`,"ok");
-        else addLog(`✗ n8n respondió con error: ${d.error||r.status}`,"error");
-      }catch(e){addLog(`✗ Error: ${e.message}`,"error");}
+        const r=await fetch(`${localUrl}/webhook/gls-sheets`,{method:"GET",mode:"cors",headers:{Accept:"application/json"}});
+        addLog(`✓ HTTP ${r.status} — CORS OK`,"ok");
+      }catch(e){addLog(`✗ CORS bloqueado: ${e.message} — Aplica las variables en EasyPanel`,"error");}
     };
     const testIncoming=()=>{
       const mock=Array.from({length:5},(_,i)=>({codexp:`GLS${100000+i}`,codservicio:["96","0","37","98","1"][i],nombdst:`EMPRESA TEST ${i+1}`,dirdst:`C/ MAYOR ${i+10}`,localidaddst:["TRUJILLO","MIAJADAS","MONTÁNCHEZ","LOGROSÁN","GARCIAZ"][i],cpdst:["10200","10100","10170","10180","10250"][i],eventoCodigo:[6,6,7,6,9][i],bultos:1,kilos:2.5,fpreviEntrega:new Date().toLocaleDateString("es-ES"),observ:"",conductor:""}));
